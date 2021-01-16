@@ -10,6 +10,66 @@
 //#define USE_AVX512
 //#define USE_AVX
 //#define USE_SSE
+
+//#define USE_SSE
+//#define USE_SSE2
+//#define USE_SSE3
+//#define USE_SSE41
+//#define USE_SSE42
+
+//#define USE_AVX
+//#define USE_AVX2
+//#define USE_FMA
+
+
+//#define USE_AVX512
+//#define USE_AVX512F
+//#define USE_KNC
+
+#ifndef DEBUG
+
+#ifdef __SSE__
+#define USE_SSE
+#endif
+
+
+#ifdef __SSE2__
+#define USE_SSE2
+#endif
+
+
+#ifdef __SSE2__
+#define USE_SSE2
+#endif
+
+
+#ifdef __SSE4_1__
+#define USE_SSE41
+#endif
+
+
+#ifdef __SSE4_2__
+#define USE_SSE42
+#endif
+
+#ifdef __AVX__
+#define USE_AVX
+#endif
+
+
+#ifdef __AVX2__
+#define USE_AVX2
+#endif
+
+
+#ifdef __FMA__
+#define USE_FMA
+#endif
+
+
+#endif //NDEBUG
+
+
 #if defined(USE_AVX512)
 
 #include <immintrin.h>
@@ -29,6 +89,22 @@
 #include <emmintrin.h>
 
 #endif
+#endif
+
+#if defined(__EMSCRIPTEN__)
+#include <wasm_simd128.h>
+#endif
+
+#if defined(__EMSCRIPTEN__)
+#include <wasm_simd128.h>
+#define USE_WASM_SIMD
+#endif
+
+#if defined(__ARM_NEON)
+
+#include <arm_neon.h>
+#define USE_NEON
+
 #endif
 
 #include <cmath>
@@ -225,6 +301,7 @@ public:
 		VectorDouble4D ret;
 		ret.v.sse[0] = _mm_add_pd(v.sse[0], vec2.v.sse[0]);
 		ret.v.sse[1] = _mm_add_pd(v.sse[1], vec2.v.sse[1]);
+		return ret;
 #else
 		VectorDouble4D ret(v.c[0] + vec2.v.c[0], v.c[1] + vec2.v.c[1], v.c[2] + vec2.v.c[2], v.c[3] + vec2.v.c[3]);
 		return ret;
@@ -541,7 +618,7 @@ class MatrixDouble4X4 {
 	}
 
 	inline MatrixDouble4X4 *identity() {
-		m = (doublemat4x4) {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0};
+		m = (doublemat4x4) {1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
 	}
 };
 

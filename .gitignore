@@ -1,2 +1,5 @@
 *.s
 cmake-build-debug
+*.html
+*.js
+*.wasm

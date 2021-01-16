@@ -3,7 +3,21 @@
 
 
 int main() {
+
+#if defined(__NVCC__)
+	std::cout << "USE CUDA" << std::endl;
+#endif
+#if defined(__EMSCRIPTEN__)
+	std::cout << "WEB" << std::endl;
+#endif
+
+#if defined(DEBUG)
+	std::cout << "debug" << std::endl;
+#endif
+
+
 	std::cout << "size : " << sizeof(VectorDouble4D) << " align : " << alignof(VectorDouble4D) << std::endl;
+	std::cout << "size double : " << sizeof(double) << " size float : " << sizeof(float) << std::endl;
 	VectorDouble4D vector;
 	VectorDouble4D vector2(0.4, 21.0, 2.4, 2.5);
 	vector += vector2;
