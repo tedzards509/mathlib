@@ -62,5 +62,27 @@ int main() {
 
 	std::cout << x[0] << " " << x[1] << " " << x[2] << " " << x[3] << std::endl;
 
+
+	VectorDouble8D vector8_1(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0);
+	VectorDouble8D vector8_2(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0);
+
+	vector8_1 += vector8_2;
+
+	std::cout << vector8_1[0] << " " << vector8_1[1] << " " << vector8_1[2] << " " << vector8_1[3] << " "
+			  << vector8_1[4] << " " << vector8_1[5] << " " << vector8_1[6] << " " << vector8_1[7] << std::endl;
+
+	vector8_1 += vector8_1;
+
+	std::cout << vector8_1[0] << " " << vector8_1[1] << " " << vector8_1[2] << " " << vector8_1[3] << " "
+			  << vector8_1[4] << " " << vector8_1[5] << " " << vector8_1[6] << " " << vector8_1[7] << std::endl;
+
 	return 0;
+
+}
+
+VectorDouble8D addV1(VectorDouble8D a, VectorDouble8D b) {
+	VectorDouble8D ret;
+	ret += a;
+	ret += b;
+	return ret;
 }
