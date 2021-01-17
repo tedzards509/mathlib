@@ -8,14 +8,14 @@ A vector can represent
 
 - A collection of values to iterate over like pixels
 
-it is designed for speed and usage of SSE, AVX, AVX512 and
-NEON thus it makes sense to group pixels into a vec64 since
-AVX512/VEC64 = 8-bit. Every type should not have memory
-overhead. I have some ideas concerning the direction to
-guide this library, but it should grow by finding useful
-usages. This library is a c++ one, but I plan to add rust,
-Lua and Python bindings. It supports multiple precisions
-like
+it is designed for speed and usage of SSE, AVX, AVX512,
+webSIMD, CUDA and NEON thus it makes sense to group pixels
+into a vec64 since AVX512/VEC64 = 8-bit. Every type should
+not have memory overhead. I have some ideas concerning the
+direction to guide this library, but it should grow by
+finding useful usages. This library is a c++ one, but I plan
+to add rust, Lua and Python bindings. It supports multiple
+precisions like
 
 - signed integer i8, i16, i32, i64
 - unsigned integer u8, u16, u32, u64
@@ -27,3 +27,7 @@ templates since I'm not comfortable and don't know how to
 detect the right vectorisation method.
 
 "main.cpp" exists for testing purposes only.
+
+Integrate the aml_lua_binding.cpp into your c++ application
+if you want to. For simple or trivial functions the aml
+version is slower.

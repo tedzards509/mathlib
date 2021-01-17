@@ -5,6 +5,7 @@
 #ifndef MATH_LIB_A_MATH_LIB_H
 #define MATH_LIB_A_MATH_LIB_H
 
+#include <stdint.h>
 
 #ifdef X86_64
 //#define USE_AVX512

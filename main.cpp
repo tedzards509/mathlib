@@ -1,5 +1,7 @@
 #include <iostream>
+#include <chrono>
 #include "amathlib.h"
+#include "aml_lua_binding.h"
 
 
 int main() {
@@ -89,6 +91,36 @@ int main() {
 
 	std::cout << vector8_1[0] << " " << vector8_1[1] << " " << vector8_1[2] << " " << vector8_1[3] << " "
 			  << vector8_1[4] << " " << vector8_1[5] << " " << vector8_1[6] << " " << vector8_1[7] << std::endl;
+
+	lua_State *L = luaL_newstate();
+	luaL_openlibs(L);
+
+	initAmlLua(L);
+	int result = luaL_dofile(L, "../test.lua");
+	if (result != LUA_OK) {
+		std::cout << "ERROR" << std::endl;
+	}
+
+	lua_close(L);
+
+	uint64_t beginTimer = std::chrono::steady_clock::now().time_since_epoch().count();
+
+	for (int i = 0; i < 10000000; i++) {
+
+		VectorDouble4D vecABench(1.0, 2.0, 3.0, 4.0);
+		VectorDouble4D vecBBench(-20.0, 100.0, 80.0, 200.0);
+
+		vecABench.add(vecBBench)->map(212.0, 32.0, 100.0, 0.0);
+
+		volatile double a = vecABench[0];
+
+	}
+
+
+	uint64_t endTimer = std::chrono::steady_clock::now().time_since_epoch().count();
+	uint64_t timeDelta = (endTimer - beginTimer);
+
+	std::cout << timeDelta / 1000000000.0f << std::endl;
 
 	return 0;
 
