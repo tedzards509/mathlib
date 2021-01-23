@@ -19,7 +19,7 @@ end
 
 first_time = os.clock()
 
-for i = 1, 10000000 do
+for i = 1, 10 do
 
     local a = { 1, 2, 3, 4 }
     local b = { -20.0, 100.0, 80.0, 200.0 }
@@ -34,7 +34,7 @@ print(last_time - first_time)
 
 first_time = os.clock()
 
-for i = 1, 10000000 do
+for i = 1, 10 do
 
     local a = { 1, 2, 3, 4 }
     local b = { -20.0, 100.0, 80.0, 200.0 }

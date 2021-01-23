@@ -105,7 +105,7 @@ int main() {
 
 	uint64_t beginTimer = std::chrono::steady_clock::now().time_since_epoch().count();
 
-	for (int i = 0; i < 10000000; i++) {
+	for (int i = 0; i < 10; i++) {
 
 		VectorDouble4D vecABench(1.0, 2.0, 3.0, 4.0);
 		VectorDouble4D vecBBench(-20.0, 100.0, 80.0, 200.0);
