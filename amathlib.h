@@ -109,6 +109,7 @@
 #endif
 
 #include <cmath>
+#include <iostream>
 
 
 union doublevec4 {
@@ -264,6 +265,40 @@ union u16vec64 {
 	__m128i sse[16];
 #endif
 	uint16_t c[64];
+};
+
+class VectorU16_2D {
+public:
+	u16vec2 v;
+
+	VectorU16_2D() {
+		v.c[0] = 0;
+		v.c[1] = 0;
+	}
+
+
+	VectorU16_2D(uint16_t a, uint16_t b) {
+		v.c[0] = a;
+		v.c[1] = b;
+	}
+};
+
+class VectorU8_4D {
+public:
+	u8vec4 v;
+
+	VectorU8_4D() {
+		v.c[0] = 0;
+		v.c[1] = 0;
+	}
+
+
+	VectorU8_4D(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+		v.c[0] = a;
+		v.c[1] = b;
+		v.c[3] = c;
+		v.c[4] = d;
+	}
 };
 
 
@@ -693,6 +728,128 @@ public:
 		v.c[6] = 0.0f;
 		v.c[7] = 0.0f;
 	}
+};
+
+
+class Complex64 {
+public:
+	doublevec2 c;
+
+
+	inline Complex64(double real, double img) {
+		c.c[0] = real;
+		c.c[1] = img;
+	}
+
+	inline Complex64() {
+		c.c[0] = 0;
+		c.c[1] = 0;
+	}
+
+	inline Complex64 *add(Complex64 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		return this;
+	}
+
+	inline Complex64 *subtract(Complex64 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		return this;
+	}
+
+	inline Complex64 *conjugate() {
+		c.c[1] = -c.c[1];
+		return this;
+	}
+
+
+	inline Complex64 *multiply(Complex64 a) {
+		double d1 = c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1];
+		double d2 = c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0];
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *divide(Complex64 a) {
+		double d1 = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+
+		return this;
+	}
+
+	inline Complex64 *sqrt() {
+		double d2 = ::sqrt((-c.c[0] + ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1])) / (2));
+		double d1;
+		if (d2 == 0) {
+			d1 = ::sqrt(c.c[0]);
+		} else {
+			d1 = c.c[1] / (2 * d2);
+		}
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *sin() {
+		double d1 = ::sin(c.c[0]) * ::cosh(c.c[1]);
+		double d2 = ::cos(c.c[1]) * ::sinh(c.c[0]);
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+
+	inline Complex64 *exp() {
+		double d1 = ::exp(c.c[0]) * ::cos(c.c[1]);
+		double d2 = ::exp(c.c[0]) * ::sin(c.c[1]);
+
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *exp(double n) {
+		double d1 = ::pow(n, c.c[0]) * ::cos(c.c[1] * ::log(n));
+		double d2 = ::pow(n, c.c[0]) * ::sin(c.c[1] * ::log(n));
+
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline double abs() {
+		return ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1]);
+	}
+
+	inline bool abs_gt(double a) {
+		return a * a < c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_lt(double a) {
+		return a * a > c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_eq(double a) {
+		return a * a == c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline double imaginary() {
+		return c.c[1];
+	}
+
+	inline double real() {
+		return c.c[0];
+	}
+
+
 };
 
 #endif //MATH_LIB_A_MATH_LIB_H

@@ -92,6 +92,25 @@ int main() {
 	std::cout << vector8_1[0] << " " << vector8_1[1] << " " << vector8_1[2] << " " << vector8_1[3] << " "
 			  << vector8_1[4] << " " << vector8_1[5] << " " << vector8_1[6] << " " << vector8_1[7] << std::endl;
 
+	Complex64 cmp1(2, 4);
+	Complex64 cmp2(4, 1);
+
+	cmp2.divide(cmp1);
+
+	std::cout << cmp2.real() << " + " << cmp2.imaginary() << "i" << std::endl;
+
+
+	cmp2.multiply(cmp1);
+
+	std::cout << cmp2.real() << " + " << cmp2.imaginary() << "i" << std::endl;
+
+	cmp2.sqrt();
+	std::cout << cmp2.real() << " + " << cmp2.imaginary() << "i" << std::endl;
+
+	cmp2.multiply(cmp2);
+
+	std::cout << cmp2.real() << " + " << cmp2.imaginary() << "i" << std::endl;
+
 	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
 
@@ -105,7 +124,7 @@ int main() {
 
 	uint64_t beginTimer = std::chrono::steady_clock::now().time_since_epoch().count();
 
-	for (int i = 0; i < 10000000; i++) {
+	for (int i = 0; i < 10; i++) {
 
 		VectorDouble4D vecABench(1.0, 2.0, 3.0, 4.0);
 		VectorDouble4D vecBBench(-20.0, 100.0, 80.0, 200.0);

@@ -5,7 +5,7 @@
 #include "aml_lua_binding.h"
 #include <iostream>
 
-int amlAdd4xN(lua_State *L) {
+int amlAdd4xN(lua_State *L) { // TODO detect the length of the table
 	if (lua_istable(L, 1) && lua_istable(L, 2)) {
 
 		double a0 = 0;
