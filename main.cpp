@@ -1,7 +1,6 @@
 #include <iostream>
-#include <chrono>
+#define USE_SSE42
 #include "amathlib.h"
-#include "aml_lua_binding.h"
 
 
 int main() {
@@ -16,7 +15,6 @@ int main() {
 #if defined(DEBUG)
 	std::cout << "debug" << std::endl;
 #endif
-
 
 	std::cout << "size : " << sizeof(VectorDouble4D) << " align : " << alignof(VectorDouble4D) << std::endl;
 	std::cout << "size double : " << sizeof(double) << " size float : " << sizeof(float) << std::endl;
@@ -111,43 +109,46 @@ int main() {
 
 	std::cout << cmp2.real() << " + " << cmp2.imaginary() << "i" << std::endl;
 
-	lua_State *L = luaL_newstate();
-	luaL_openlibs(L);
 
-	initAmlLua(L);
-	int result = luaL_dofile(L, "../test.lua");
-	if (result != LUA_OK) {
-		std::cout << "ERROR" << std::endl;
-	}
+	MatrixDouble4X4 m;
+	m.identity();
 
-	lua_close(L);
+	VectorDouble4D matVec = m[3];
 
-	uint64_t beginTimer = std::chrono::steady_clock::now().time_since_epoch().count();
+	std::cout << matVec[0] << " " << matVec[1] << " " << matVec[2] << " " << matVec[3] << std::endl;
 
-	for (int i = 0; i < 10; i++) {
+	MatrixDouble4X4 m2 = {{1,  2,  3,  4},
+						  {5,  6,  7,  8},
+						  {9,  10, 11, 12},
+						  {13, 14, 15, 16}};
 
-		VectorDouble4D vecABench(1.0, 2.0, 3.0, 4.0);
-		VectorDouble4D vecBBench(-20.0, 100.0, 80.0, 200.0);
+	//MatrixDouble4X4 m2;
 
-		vecABench.add(vecBBench)->map(212.0, 32.0, 100.0, 0.0);
+	//m2.identity();
 
-		volatile double a = vecABench[0];
+	MatrixDouble4X4 m3 = m2 * m2;
 
-	}
+	matVec = m3[3];
 
+	std::cout << (float) matVec[0] << " " << (float) matVec[1] << " " << (float) matVec[2] << " " << (float) matVec[3]
+			  << std::endl;
 
-	uint64_t endTimer = std::chrono::steady_clock::now().time_since_epoch().count();
-	uint64_t timeDelta = (endTimer - beginTimer);
+	m2.identity();
 
-	std::cout << timeDelta / 1000000000.0f << std::endl;
+	m3 = m3 * m2;
+
+	matVec = m3[3];
+
+	std::cout << (float) matVec[0] << " " << (float) matVec[1] << " " << (float) matVec[2] << " " << (float) matVec[3]
+			  << std::endl;
+
+	VectorDouble4D matVec2 = {0, 1, 2, 3};
+
+	matVec2 = m3 * matVec2;
+
+	std::cout << (float) matVec2[0] << " " << (float) matVec2[1] << " " << (float) matVec2[2] << " "
+			  << (float) matVec2[3] << std::endl;
 
 	return 0;
 
-}
-
-VectorDouble8D addV1(VectorDouble8D a, VectorDouble8D b) {
-	VectorDouble8D ret;
-	ret += a;
-	ret += b;
-	return ret;
 }
