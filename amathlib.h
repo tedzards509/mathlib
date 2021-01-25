@@ -115,7 +115,9 @@
 #include <immintrin.h>
 #endif
 #ifdef USE_SSE
+
 #include <emmintrin.h>
+
 #endif
 
 #if defined(__EMSCRIPTEN__)
@@ -143,6 +145,9 @@ union doublevec4 {
 #ifdef USE_SSE
 	__m128d sse[2];
 #endif
+#ifdef USE_NEON
+	float64x2_t neon[2];
+#endif
 	double c[4];
 };
 
@@ -156,6 +161,9 @@ union doublevec8 {
 #ifdef USE_SSE
 	__m128d sse[4];
 #endif
+#ifdef USE_NEON
+	float64x2_t neon[4];
+#endif
 	double c[8];
 };
 
@@ -166,12 +174,18 @@ union doublemat4x4 {
 #ifdef USE_SSE
 	__m128d sse[8];
 #endif
+#ifdef USE_NEON
+	float64x2_t neon[8];
+#endif
 	double c[16];
 };
 
 union doublevec2 {
 #ifdef USE_SSE
 	__m128d sse;
+#endif
+#ifdef USE_NEON
+	float64x2_t neon;
 #endif
 	double c[2];
 };
@@ -342,6 +356,9 @@ public:
 #elif defined(USE_SSE) // SSE2
 		v.sse[0] = _mm_add_pd(v.sse[0], vec2.v.sse[0]);
 		v.sse[1] = _mm_add_pd(v.sse[1], vec2.v.sse[1]);
+#elif defined(USE_NEON)
+		v.neon[0] = vaddq_f64(v.neon[0], vec2.v.neon[0]);
+		v.neon[1] = vaddq_f64(v.neon[1], vec2.v.neon[1]);
 #else
 		v.c[0] += vec2[0];
 		v.c[1] += vec2[1];
@@ -362,6 +379,11 @@ public:
 		ret.v.sse[0] = _mm_add_pd(v.sse[0], vec2.v.sse[0]);
 		ret.v.sse[1] = _mm_add_pd(v.sse[1], vec2.v.sse[1]);
 		return ret;
+#elif defined(USE_NEON)
+		VectorDouble4D ret;
+		ret.v.neon[0] = vaddq_f64(v.neon[0], vec2.v.neon[0]);
+		ret.v.neon[1] = vaddq_f64(v.neon[1], vec2.v.neon[1]);
+		return ret;
 #else
 		VectorDouble4D ret(v.c[0] + vec2.v.c[0], v.c[1] + vec2.v.c[1], v.c[2] + vec2.v.c[2], v.c[3] + vec2.v.c[3]);
 		return ret;
@@ -380,6 +402,11 @@ public:
 		ret.v.sse[0] = _mm_add_pd(v.sse[0], ret.v.sse[0]);
 		ret.v.sse[1] = _mm_add_pd(v.sse[1], ret.v.sse[1]);
 		return ret;
+#elif defined(USE_NEON)
+		VectorDouble4D ret(a);
+		ret.v.neon[0] = vaddq_f64(v.neon[0], ret.v.neon[0]);
+		ret.v.neon[1] = vaddq_f64(v.neon[1], ret.v.neon[1]);
+		return ret;
 #else
 		VectorDouble4D ret(v.c[0] + a, v.c[1] + a, v.c[2] + a, v.c[3] + a);
 		return ret;
@@ -394,6 +421,10 @@ public:
 #elif defined(USE_SSE) // SSE2
 		v.sse[0] = _mm_add_pd(v.sse[0], a.v.sse[0]);
 		v.sse[1] = _mm_add_pd(v.sse[1], a.v.sse[1]);
+#elif defined(USE_NEON)
+		VectorDouble4D ret(a);
+		v.neon[0] = vaddq_f64(v.neon[0], ret.v.neon[0]);
+		v.neon[1] = vaddq_f64(v.neon[1], ret.v.neon[1]);
 #else
 		v.c[0] += a.v.c[0];
 		v.c[1] += a.v.c[1];
@@ -496,6 +527,9 @@ public:
 	inline void operator*=(VectorDouble4D vec2) {
 #if defined(USE_AVX)
 		v.avx = _mm256_mul_pd(v.avx, vec2.v.avx);
+#elif defined(USE_NEON)
+		v.neon[0] = vmulq_f64(v.neon[0],vec2.v.neon[0]);
+		v.neon[1] = vmulq_f64(v.neon[1],vec2.v.neon[1]);
 #else
 		v.c[0] *= vec2.v.c[0];
 		v.c[1] *= vec2.v.c[1];

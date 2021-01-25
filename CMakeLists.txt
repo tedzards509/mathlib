@@ -15,9 +15,26 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif ()
 
-set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_COMPILER "clang++")
+if (UNIX)
+    set(CMAKE_C_COMPILER "clang")
+    set(CMAKE_CXX_COMPILER "clang++")
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG -O3 -march=native -ffast-math")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -ffast-math")
+
+    message(STATUS ${CMAKE_SYSTEM_PROCESSOR})
+
+    if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+        set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+        set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG -O3 -mcpu=cortex-a72 -ffast-math")
+        set(CMAKE_CXX_FLAGS_RELEASE "-O3 -mcpu=cortex-a72 -ffast-math")
+    elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+        set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+        set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG -O3 -march=native -ffast-math")
+        set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -ffast-math")
+    else ()
+
+        set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+        set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG -O3 -ffast-math")
+        set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math")
+    endif ()
+
+endif ()

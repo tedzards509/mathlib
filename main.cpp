@@ -1,5 +1,7 @@
 #include <iostream>
+
 #define USE_SSE42
+
 #include "amathlib.h"
 
 
