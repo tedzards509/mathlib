@@ -1,1 +1,1 @@
-emcc main.cpp -O3 -s WASM=1 -o hello.html -s NO_EXIT_RUNTIME=1 -s "EXTRA_EXPORTED_RUNTIME_METHODS=['addV1']"
+emcc main.cpp -O3 -ffast-math -s WASM=1 -o hello.html -s NO_EXIT_RUNTIME=1

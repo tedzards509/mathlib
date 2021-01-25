@@ -7,8 +7,6 @@
 
 #define DEBUG_TO_INDEX(row, column) ((column - 1) * 4 + (row-1))
 
-#include <cstdint>
-
 //#define USE_AVX512
 //#define USE_AVX
 //#define USE_SSE
@@ -30,6 +28,7 @@
 
 #ifndef DEBUG
 
+#if defined(__x86_64__)
 #ifdef __SSE__
 #define USE_SSE
 #endif
@@ -67,17 +66,18 @@
 #ifdef __FMA__
 #define USE_FMA
 #endif
-
+#endif // INTEL
 
 #endif //NDEBUG
 
 #if defined(DEBUG)
-
+#if defined(__x86_64__)
 #if defined(USE_AVX512F)
 #define USE_AVX512
 #endif
 #if defined(USE_AVX512)
 #define USE_AVX512F
+#define USE_FMA
 #endif
 #if defined(USE_FMA)
 #define USE_AVX2
@@ -118,7 +118,8 @@
 
 #include <emmintrin.h>
 
-#endif
+#endif //INTEL
+#endif //DEBUG
 
 #if defined(__EMSCRIPTEN__)
 #include <wasm_simd128.h>
@@ -130,14 +131,21 @@
 #endif
 
 #if defined(__ARM_NEON)
+
 #include <arm_neon.h>
+
 #define USE_NEON
-#endif
+
+#include <math.h>
+#include <stdint.h>
+
+#else
+
+#include <cstdint>
 
 #include <cmath>
-#include <iostream>
 
-
+#endif
 union doublevec4 {
 #ifdef USE_AVX
 	__m256d avx;
@@ -168,6 +176,9 @@ union doublevec8 {
 };
 
 union doublemat4x4 {
+#ifdef USE_AVX512
+	__m512d avx512[2];
+#endif
 #ifdef USE_AVX
 	__m256d avx[4];
 #endif
@@ -528,8 +539,8 @@ public:
 #if defined(USE_AVX)
 		v.avx = _mm256_mul_pd(v.avx, vec2.v.avx);
 #elif defined(USE_NEON)
-		v.neon[0] = vmulq_f64(v.neon[0],vec2.v.neon[0]);
-		v.neon[1] = vmulq_f64(v.neon[1],vec2.v.neon[1]);
+		v.neon[0] = vmulq_f64(v.neon[0], vec2.v.neon[0]);
+		v.neon[1] = vmulq_f64(v.neon[1], vec2.v.neon[1]);
 #else
 		v.c[0] *= vec2.v.c[0];
 		v.c[1] *= vec2.v.c[1];
@@ -719,7 +730,30 @@ public:
 
 	inline MatrixDouble4X4 operator*(MatrixDouble4X4 b) {
 		MatrixDouble4X4 ret;
-#if defined(USE_FMA)
+#if defined(USE_AVX512F)
+		__m512d O0 = (__m512d) {b.m.c[0],b.m.c[0],b.m.c[0],b.m.c[0],b.m.c[4],b.m.c[4],b.m.c[4],b.m.c[4]};
+		__m512d O1 = (__m512d) {b.m.c[1],b.m.c[1],b.m.c[1],b.m.c[1],b.m.c[5],b.m.c[5],b.m.c[5],b.m.c[5]};
+		__m512d O2 = (__m512d) {b.m.c[2],b.m.c[2],b.m.c[2],b.m.c[2],b.m.c[6],b.m.c[6],b.m.c[6],b.m.c[6]};
+		__m512d O3 = (__m512d) {b.m.c[3],b.m.c[3],b.m.c[3],b.m.c[3],b.m.c[7],b.m.c[7],b.m.c[7],b.m.c[7]};
+
+		__m512d T0 =_mm512_insertf64x4(_mm512_castpd256_pd512(m.avx[0]),m.avx[0],1);
+		__m512d T1 =_mm512_insertf64x4(_mm512_castpd256_pd512(m.avx[1]),m.avx[1],1);
+		__m512d T2 =_mm512_insertf64x4(_mm512_castpd256_pd512(m.avx[2]),m.avx[2],1);
+		__m512d T3 =_mm512_insertf64x4(_mm512_castpd256_pd512(m.avx[3]),m.avx[3],1);
+		ret.m.avx512[0] = _mm512_mul_pd(T0, O0);
+		ret.m.avx512[0] = _mm512_fmadd_pd(T1,O1,ret.m.avx512[0]);
+		ret.m.avx512[0] = _mm512_fmadd_pd(T2,O2,ret.m.avx512[0]);
+		ret.m.avx512[0] = _mm512_fmadd_pd(T3,O3,ret.m.avx512[0]);
+
+		__m512d O4 = (__m512d) {b.m.c[8],b.m.c[8],b.m.c[8],b.m.c[8],b.m.c[12],b.m.c[12],b.m.c[12],b.m.c[12]};
+		__m512d O5 = (__m512d) {b.m.c[9],b.m.c[9],b.m.c[9],b.m.c[9],b.m.c[13],b.m.c[13],b.m.c[13],b.m.c[13]};
+		__m512d O6 = (__m512d) {b.m.c[10],b.m.c[10],b.m.c[10],b.m.c[10],b.m.c[14],b.m.c[14],b.m.c[14],b.m.c[14]};
+		__m512d O7 = (__m512d) {b.m.c[11],b.m.c[11],b.m.c[11],b.m.c[11],b.m.c[15],b.m.c[15],b.m.c[15],b.m.c[15]};
+		ret.m.avx512[1] = _mm512_mul_pd(T0, O4);
+		ret.m.avx512[1] = _mm512_fmadd_pd(T1,O5,ret.m.avx512[1]);
+		ret.m.avx512[1] = _mm512_fmadd_pd(T2,O6,ret.m.avx512[1]);
+		ret.m.avx512[1] = _mm512_fmadd_pd(T3,O7,ret.m.avx512[1]);
+#elif defined(USE_FMA)
 		/*
 		 * m0 * bcst 0
 		 * m0 * bcst 4
@@ -834,15 +868,66 @@ public:
 		ret.m.sse[7] = _mm_add_pd(cache, ret.m.sse[7]);
 		cache = _mm_mul_pd(m.sse[7], (__m128d) {b.m.c[15], b.m.c[15]});
 		ret.m.sse[7] = _mm_add_pd(cache, ret.m.sse[7]);
+#elif defined(USE_NEON)
+		ret.m.neon[0] = vmulq_f64(m.neon[0], (float64x2_t) {b.m.c[0], b.m.c[0]});
+		ret.m.neon[0] = vfmaq_f64(ret.m.neon[0], m.neon[2], (float64x2_t) {b.m.c[1], b.m.c[1]});
+		ret.m.neon[0] = vfmaq_f64(ret.m.neon[0], m.neon[4], (float64x2_t) {b.m.c[2], b.m.c[2]});
+		ret.m.neon[0] = vfmaq_f64(ret.m.neon[0], m.neon[6], (float64x2_t) {b.m.c[3], b.m.c[3]});
+		//
+		ret.m.neon[1] = vmulq_f64(m.neon[1], (float64x2_t) {b.m.c[0], b.m.c[0]});
+		ret.m.neon[1] = vfmaq_f64(ret.m.neon[1], m.neon[3], (float64x2_t) {b.m.c[1], b.m.c[1]});
+		ret.m.neon[1] = vfmaq_f64(ret.m.neon[1], m.neon[5], (float64x2_t) {b.m.c[2], b.m.c[2]});
+		ret.m.neon[1] = vfmaq_f64(ret.m.neon[1], m.neon[7], (float64x2_t) {b.m.c[3], b.m.c[3]});
+		//
+		ret.m.neon[2] = vmulq_f64(m.neon[0], (float64x2_t) {b.m.c[4], b.m.c[4]});
+		ret.m.neon[2] = vfmaq_f64(ret.m.neon[2], m.neon[2], (float64x2_t) {b.m.c[5], b.m.c[5]});
+		ret.m.neon[2] = vfmaq_f64(ret.m.neon[2], m.neon[4], (float64x2_t) {b.m.c[6], b.m.c[6]});
+		ret.m.neon[2] = vfmaq_f64(ret.m.neon[2], m.neon[6], (float64x2_t) {b.m.c[7], b.m.c[7]});
+
+		//
+		ret.m.neon[3] = vmulq_f64(m.neon[1], (float64x2_t) {b.m.c[4], b.m.c[4]});
+		ret.m.neon[3] = vfmaq_f64(ret.m.neon[3], m.neon[3], (float64x2_t) {b.m.c[5], b.m.c[5]});
+		ret.m.neon[3] = vfmaq_f64(ret.m.neon[3], m.neon[5], (float64x2_t) {b.m.c[6], b.m.c[6]});
+		ret.m.neon[3] = vfmaq_f64(ret.m.neon[3], m.neon[7], (float64x2_t) {b.m.c[7], b.m.c[7]});
+
+		//
+		ret.m.neon[4] = vmulq_f64(m.neon[0], (float64x2_t) {b.m.c[8], b.m.c[8]});
+		ret.m.neon[4] = vfmaq_f64(ret.m.neon[4], m.neon[2], (float64x2_t) {b.m.c[9], b.m.c[9]});
+		ret.m.neon[4] = vfmaq_f64(ret.m.neon[4], m.neon[4], (float64x2_t) {b.m.c[10], b.m.c[10]});
+		ret.m.neon[4] = vfmaq_f64(ret.m.neon[4], m.neon[6], (float64x2_t) {b.m.c[11], b.m.c[11]});
+
+		//
+		ret.m.neon[5] = vmulq_f64(m.neon[1], (float64x2_t) {b.m.c[8], b.m.c[8]});
+		ret.m.neon[5] = vfmaq_f64(ret.m.neon[5], m.neon[3], (float64x2_t) {b.m.c[9], b.m.c[9]});
+		ret.m.neon[5] = vfmaq_f64(ret.m.neon[5], m.neon[5], (float64x2_t) {b.m.c[10], b.m.c[10]});
+		ret.m.neon[5] = vfmaq_f64(ret.m.neon[5], m.neon[7], (float64x2_t) {b.m.c[11], b.m.c[11]});
+
+		//
+
+		ret.m.neon[6] = vmulq_f64(m.neon[0], (float64x2_t) {b.m.c[12], b.m.c[12]});
+		ret.m.neon[6] = vfmaq_f64(ret.m.neon[6], m.neon[2], (float64x2_t) {b.m.c[13], b.m.c[13]});
+		ret.m.neon[6] = vfmaq_f64(ret.m.neon[6], m.neon[4], (float64x2_t) {b.m.c[14], b.m.c[14]});
+		ret.m.neon[6] = vfmaq_f64(ret.m.neon[6], m.neon[6], (float64x2_t) {b.m.c[15], b.m.c[15]});
+
+		//
+		ret.m.neon[7] = vmulq_f64(m.neon[1], (float64x2_t) {b.m.c[12], b.m.c[12]});
+		ret.m.neon[7] = vfmaq_f64(ret.m.neon[7], m.neon[3], (float64x2_t) {b.m.c[13], b.m.c[13]});
+		ret.m.neon[7] = vfmaq_f64(ret.m.neon[7], m.neon[5], (float64x2_t) {b.m.c[14], b.m.c[14]});
+		ret.m.neon[7] = vfmaq_f64(ret.m.neon[7], m.neon[7], (float64x2_t) {b.m.c[15], b.m.c[15]});
+
+
 #else
-		ret.m.c[0]  = m.c[0] * b.m.c[0]  + m.c[4] * b.m.c[1]  + m.c[8]  * b.m.c[2]  + m.c[12] * b.m.c[3];// c11 = a11 * b11 + a12 * b21 + ...
-		ret.m.c[1]  = m.c[1] * b.m.c[0]  + m.c[5] * b.m.c[1]  + m.c[9]  * b.m.c[2]  + m.c[13] * b.m.c[3];// c12 = a21 + b11 + a22 + b21
-		ret.m.c[2]  = m.c[2] * b.m.c[0]  + m.c[6] * b.m.c[1]  + m.c[10] * b.m.c[2]  + m.c[14] * b.m.c[3];
-		ret.m.c[3]  = m.c[3] * b.m.c[0]  + m.c[7] * b.m.c[1]  + m.c[11] * b.m.c[2]  + m.c[15] * b.m.c[3];
-		ret.m.c[4]  = m.c[0] * b.m.c[4]  + m.c[4] * b.m.c[5]  + m.c[8]  * b.m.c[6]  + m.c[12] * b.m.c[7];// c21 = a11 * b12 + b12 * b22 + ...
-		ret.m.c[5]  = m.c[1] * b.m.c[4]  + m.c[5] * b.m.c[5]  + m.c[9]  * b.m.c[6]  + m.c[13] * b.m.c[7];
-		ret.m.c[6]  = m.c[2] * b.m.c[4]  + m.c[6] * b.m.c[5]  + m.c[10] * b.m.c[6]  + m.c[14] * b.m.c[7];
-		ret.m.c[7]  = m.c[3] * b.m.c[4]  + m.c[7] * b.m.c[5]  + m.c[11] * b.m.c[6]  + m.c[15] * b.m.c[7];
+		ret.m.c[0] = m.c[0] * b.m.c[0] + m.c[4] * b.m.c[1] + m.c[8] * b.m.c[2] +
+					 m.c[12] * b.m.c[3];// c11 = a11 * b11 + a12 * b21 + ...
+		ret.m.c[1] = m.c[1] * b.m.c[0] + m.c[5] * b.m.c[1] + m.c[9] * b.m.c[2] +
+					 m.c[13] * b.m.c[3];// c12 = a21 + b11 + a22 + b21
+		ret.m.c[2] = m.c[2] * b.m.c[0] + m.c[6] * b.m.c[1] + m.c[10] * b.m.c[2] + m.c[14] * b.m.c[3];
+		ret.m.c[3] = m.c[3] * b.m.c[0] + m.c[7] * b.m.c[1] + m.c[11] * b.m.c[2] + m.c[15] * b.m.c[3];
+		ret.m.c[4] = m.c[0] * b.m.c[4] + m.c[4] * b.m.c[5] + m.c[8] * b.m.c[6] +
+					 m.c[12] * b.m.c[7];// c21 = a11 * b12 + b12 * b22 + ...
+		ret.m.c[5] = m.c[1] * b.m.c[4] + m.c[5] * b.m.c[5] + m.c[9] * b.m.c[6] + m.c[13] * b.m.c[7];
+		ret.m.c[6] = m.c[2] * b.m.c[4] + m.c[6] * b.m.c[5] + m.c[10] * b.m.c[6] + m.c[14] * b.m.c[7];
+		ret.m.c[7] = m.c[3] * b.m.c[4] + m.c[7] * b.m.c[5] + m.c[11] * b.m.c[6] + m.c[15] * b.m.c[7];
 		ret.m.c[8]  = m.c[0] * b.m.c[8]  + m.c[4] * b.m.c[9]  + m.c[8]  * b.m.c[10] + m.c[12] * b.m.c[11];
 		ret.m.c[9]  = m.c[1] * b.m.c[8]  + m.c[5] * b.m.c[9]  + m.c[9]  * b.m.c[10] + m.c[13] * b.m.c[11];
 		ret.m.c[10] = m.c[2] * b.m.c[8]  + m.c[6] * b.m.c[9]  + m.c[10] * b.m.c[10] + m.c[14] * b.m.c[11];

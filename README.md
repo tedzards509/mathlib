@@ -1,6 +1,13 @@
-A (for now) header-only math lib
+A (for now) header-only math lib for 64-bit(x86_64, aarch64,
+risc-v NOT TESTED)
 
-please don't contribute for now
+It is not designed to be light weight or easy to develop. It
+should be fast. It is header-only making it easy to
+integrate into different projects, build processes and
+platforms.
+
+please don't contribute for now, at least for bindings until
+the design is thought through
 
 A vector can represent
 
@@ -8,14 +15,22 @@ A vector can represent
 
 - A collection of values to iterate over like pixels
 
+A matrix can represent
+
+- A math matrix
+
+Since matrices and complex numbers are always used
+mathematically, they don't have integer counterparts.
+
 it is designed for speed and usage of SSE, AVX, AVX512,
 webSIMD, CUDA and NEON thus it makes sense to group pixels
-into a vec64 since AVX512/VEC64 = 8-bit. Every type should
-not have memory overhead. I have some ideas concerning the
-direction to guide this library, but it should grow by
-finding useful usages. This library is a c++ one, but I plan
-to add rust, Lua and Python bindings. It supports multiple
-precisions like
+into a vec64 since AVX512/VEC64 = 8-bit. Maybe I'll add an
+Array Type that sorts this stuff automatically. Every type
+should not have memory overhead. I have some ideas
+concerning the direction to guide this library, but it
+should grow as I find useful usages. This library is a c++
+one, but I plan to add rust, Lua and Python bindings. It
+supports multiple precisions like
 
 - signed integer i8, i16, i32, i64
 - unsigned integer u8, u16, u32, u64
@@ -29,5 +44,5 @@ detect the right vectorisation method.
 "main.cpp" exists for testing purposes only.
 
 Integrate the aml_lua_binding.cpp into your c++ application
-if you want to. For simple or trivial functions the aml
-version is slower.
+if you want to. For simple or trivial functions(like
+addition) the aml version is slower.
