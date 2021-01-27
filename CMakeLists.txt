@@ -16,8 +16,8 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 if (UNIX)
-    set(CMAKE_C_COMPILER "clang")
-    set(CMAKE_CXX_COMPILER "clang++")
+    set(CMAKE_C_COMPILER "clang")# gcc clang
+    set(CMAKE_CXX_COMPILER "clang++")# g++ clang++
 
 
     message(STATUS ${CMAKE_SYSTEM_PROCESSOR})

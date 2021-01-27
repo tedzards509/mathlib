@@ -1,8 +1,8 @@
 
+#define USE_FMA
+
 #include "amathlib.h"
 #include <iostream>
-
-#define USE_SSE42
 
 int main() {
 
@@ -22,6 +22,7 @@ int main() {
 	VectorDouble4D vector;
 	VectorDouble4D vector2(0.4, 21.0, 2.4, 2.5);
 	vector += vector2;
+	vector2[0] += 1;
 	std::cout << vector[0] << " " << vector[1] << " " << vector[2] << " " << vector[3] << std::endl;
 	vector.normalize();
 	std::cout << vector[0] << " " << vector[1] << " " << vector[2] << " " << vector[3] << std::endl;
@@ -150,6 +151,77 @@ int main() {
 	std::cout << (float) matVec2[0] << " " << (float) matVec2[1] << " " << (float) matVec2[2] << " "
 			  << (float) matVec2[3] << std::endl;
 
+	for (int x = 0; x < 40; x++) {
+		for (int y = 0; y < 200; y++) {
+			Complex64 c(((double) x) / 20.0f - 1.5f, ((double) y) / 100.0f - 1.0f);
+			Complex64 z = c;
+			int i = 0;
+			int result = 10;
+			for (; i < 10; ++i) {
+				z = z * z + c;
+				if (z.abs_gt(2)) {
+					result = i;
+					break;
+				}
+			}
+			if (result >= 10) {
+				std::cout << "#";
+			} else {
+				std::cout << " ";
+			}
+		}
+		std::cout << std::endl;
+	}
+	RECOMMENDED_COMPLEX_64_TYPE complex64;
+	for (int x = 0; x < 40; x++) {
+		for (int y = 0; y < 200 / RECOMMENDED_COMPLEX_64_SIZE; y++) {
+			RECOMMENDED_COMPLEX_64_TYPE complex64_C;
+			RECOMMENDED_COMPLEX_64_TYPE complex64_Z;
+			for (int index = 0; index < RECOMMENDED_COMPLEX_64_SIZE; index++) {
+				complex64_C.set(index, Complex64(((double) x) / 20.0f - 1.5f,
+												 ((double) y * RECOMMENDED_COMPLEX_64_SIZE + index) / 100.0f - 1.0f));
+			}
+			complex64_Z = complex64_C;
+			RECOMMENDED_COMPLEX_64_VECTOR_TYPE result(10);
+			int i = 0;
+			RECOMMENDED_COMPLEX_64_MASK_TYPE mask;
+			RECOMMENDED_COMPLEX_64_MASK_TYPE mask2;
+			RECOMMENDED_COMPLEX_64_MASK_TYPE oldMask;
+			for (; i < 10; ++i) {
+				complex64_Z = (complex64_Z * complex64_Z) + complex64_C;
+				mask = complex64_Z.abs_gt(2);
+				bool anyFinished = mask.anyTrue();
+				if (anyFinished) {
+					oldMask = mask;
+					result.set(i, mask);
+					break;
+				}
+			}
+			if (!(mask.allTrue())) {
+				for (; i < 10; ++i) {
+					complex64_Z.multiply(complex64_Z, !mask)->add(complex64_C, !mask);
+					mask = complex64_Z.abs_gt(2);
+					mask2 = mask && !oldMask;
+					if (mask2.anyTrue()) {
+						oldMask = mask;
+						result.set(i, mask2);
+
+					}
+					if (mask.allTrue()) {
+						break;
+					}
+				}
+			}
+			for (int index = 0; index < RECOMMENDED_COMPLEX_64_SIZE; index++) {
+				if (result[index] >= 10) {
+					std::cout << "#";
+				} else {
+					std::cout << " ";
+				}
+			}
+		}
+		std::cout << std::endl;
+	}
 	return 0;
 
 }

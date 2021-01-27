@@ -5,3 +5,5 @@ cmake-build-debug
 *.js
 *.wasm
 build
+
+samples/mandelbrot

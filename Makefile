@@ -1,0 +1,2 @@
+all:
+	nvcc cudatest.cu
