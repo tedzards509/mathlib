@@ -802,6 +802,11 @@ public:
 		v.c[1] = 0.0f;
 	}
 
+	inline VectorDouble2D(double value) {
+		v.c[0] = value;
+		v.c[1] = value;
+	}
+
 	inline double &operator[](uint32_t location) {
 		return v.c[location];
 	}
