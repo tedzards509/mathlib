@@ -802,6 +802,10 @@ public:
 		v.c[1] = 0.0f;
 	}
 
+	inline double &operator[](uint32_t location) {
+		return v.c[location];
+	}
+
 #if defined(USE_SSE)
 
 	inline VectorDouble2D(const __m128d value) {
@@ -1698,9 +1702,9 @@ public:
 #define RECOMMENDED_COMPLEX_64_TYPE Array4Complex64
 #define RECOMMENDED_COMPLEX_64_MASK_TYPE VectorU8_4D
 #define RECOMMENDED_COMPLEX_64_VECTOR_TYPE VectorDouble4D
-#define IDEAL_COMPLEX_64-SIZE 2
+#define IDEAL_COMPLEX_64_SIZE 2
 #define IDEAL_COMPLEX_64_TYPE Array2Complex64
-#define IDEAL_COMPLEX_64_MASK_TYPE u8vec2
+#define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_2D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble2D
 
 
@@ -1708,13 +1712,15 @@ public:
 #define RECOMMENDED_COMPLEX_32_TYPE Array4Complex32
 #define RECOMMENDED_COMPLEX_32_MASK_TYPE VectorU8_8D
 #define RECOMMENDED_COMPLEX_32_VECTOR_TYPE VectorFloat8D
-#define IDEAL_COMPLEX_32-SIZE 4
+#define IDEAL_COMPLEX_32_SIZE 4
 #define IDEAL_COMPLEX_32_TYPE Array2Complex32
 #define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_4D
 #define IDEAL_COMPLEX_32_VECTOR_TYPE VectorFloat4D
 
 
 #else
+
+#error µARCH not supported // TODO solve
 
 #define RECOMMENDED_COMPLEX_64_SIZE 1
 #define RECOMMENDED_COMPLEX_64_TYPE Complex64
