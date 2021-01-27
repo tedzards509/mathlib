@@ -1,5 +1,5 @@
 
-#define USE_SSE42
+//#define USE_SSE42
 
 #include "amathlib.h"
 #include <iostream>
@@ -176,21 +176,21 @@ int main() {
 		}
 		std::cout << std::endl;
 	}
-	RECOMMENDED_COMPLEX_64_TYPE complex64;
+	MAX_COMPLEX_64_TYPE complex64;
 	for (int x = 0; x < 40; x++) {
-		for (int y = 0; y < 200 / RECOMMENDED_COMPLEX_64_SIZE; y++) {
-			RECOMMENDED_COMPLEX_64_TYPE complex64_C;
-			RECOMMENDED_COMPLEX_64_TYPE complex64_Z;
-			for (int index = 0; index < RECOMMENDED_COMPLEX_64_SIZE; index++) {
+		for (int y = 0; y < 200 / MAX_COMPLEX_64_SIZE; y++) {
+			MAX_COMPLEX_64_TYPE complex64_C;
+			MAX_COMPLEX_64_TYPE complex64_Z;
+			for (int index = 0; index < MAX_COMPLEX_64_SIZE; index++) {
 				complex64_C.set(index, Complex64(((double) x) / 20.0f - 1.5f,
-												 ((double) y * RECOMMENDED_COMPLEX_64_SIZE + index) / 100.0f - 1.0f));
+												 ((double) y * MAX_COMPLEX_64_SIZE + index) / 100.0f - 1.0f));
 			}
 			complex64_Z = complex64_C;
-			RECOMMENDED_COMPLEX_64_VECTOR_TYPE result(10);
+			MAX_COMPLEX_64_VECTOR_TYPE result(10);
 			int i = 0;
-			RECOMMENDED_COMPLEX_64_MASK_TYPE mask;
-			RECOMMENDED_COMPLEX_64_MASK_TYPE mask2;
-			RECOMMENDED_COMPLEX_64_MASK_TYPE oldMask;
+			MAX_COMPLEX_64_MASK_TYPE mask;
+			MAX_COMPLEX_64_MASK_TYPE mask2;
+			MAX_COMPLEX_64_MASK_TYPE oldMask;
 			for (; i < 10; ++i) {
 				complex64_Z = (complex64_Z * complex64_Z) + complex64_C;
 				mask = complex64_Z.abs_gt(2);
@@ -216,7 +216,7 @@ int main() {
 					}
 				}
 			}
-			for (int index = 0; index < RECOMMENDED_COMPLEX_64_SIZE; index++) {
+			for (int index = 0; index < MAX_COMPLEX_64_SIZE; index++) {
 				if (result[index] >= 10) {
 					std::cout << "#";
 				} else {

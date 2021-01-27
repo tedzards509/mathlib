@@ -237,6 +237,14 @@ union doublevec2 {
 	double c[2];
 };
 
+union doublevec1 {
+	double c;
+};
+
+union u8vec1 { // limited use
+	uint8_t c;
+};
+
 union u8vec2 {
 	uint8_t c[2];
 };
@@ -368,6 +376,177 @@ public:
 	}
 };
 
+
+class VectorU8_1D {
+public:
+	u8vec1 v{};
+
+	inline VectorU8_1D() {
+		v.c = 0;
+	}
+
+	inline explicit VectorU8_1D(const u8vec1 &vec) {
+		v = vec;
+	}
+
+
+	inline VectorU8_1D(uint8_t a) {
+		v.c = a;
+	}
+
+	inline uint8_t &operator[]([[maybe_unused]]uint32_t location) {
+		return v.c;
+	}
+
+	inline bool anyTrue() {
+		if (v.c) {
+			return true;
+		}
+		return false;
+	}
+
+	inline bool anyTrue(VectorU8_1D mask) {
+		if (v.c && mask.v.c) {
+			return true;
+		}
+		return false;
+	}
+
+	inline bool allTrue() {
+		if (!v.c) {
+			return false;
+		}
+		return true;
+	}
+
+	inline VectorU8_1D operator!() {
+		VectorU8_1D ret;
+		ret.v.c = !v.c;
+		return ret;
+	}
+
+	inline VectorU8_1D *bitNot() {
+		v.c = !v.c;
+		return this;
+	}
+
+	inline VectorU8_1D operator&(VectorU8_1D o) {
+		VectorU8_1D ret;
+		ret.v.c = v.c & o.v.c;
+		return ret;
+	}
+
+	inline VectorU8_1D *bitAnd(VectorU8_1D o) {
+		v.c = v.c & o.v.c;
+		return this;
+	}
+
+	inline VectorU8_1D operator&&(VectorU8_1D o) {
+		VectorU8_1D ret;
+		ret.v.c = v.c && o.v.c;
+		return ret;
+	}
+
+	inline VectorU8_1D *boolAnd(VectorU8_1D o) {
+		v.c = v.c && o.v.c;
+		return this;
+	}
+};
+
+class VectorU8_2D {
+public:
+	u8vec2 v{};
+
+	inline VectorU8_2D() {
+		v.c[0] = 0;
+		v.c[1] = 0;
+	}
+
+	inline explicit VectorU8_2D(const u8vec2 &vec) {
+		v = vec;
+	}
+
+
+	inline VectorU8_2D(uint8_t a, uint8_t b) {
+		v.c[0] = a;
+		v.c[1] = b;
+	}
+
+	inline uint8_t &operator[](uint32_t location) {
+		return v.c[location];
+	}
+
+	inline bool anyTrue() {
+		if (v.c[0]) {
+			return true;
+		}
+		if (v.c[1]) {
+			return true;
+		}
+		return false;
+	}
+
+	inline bool anyTrue(VectorU8_2D mask) {
+		if (v.c[0] && mask.v.c[0]) {
+			return true;
+		}
+		if (v.c[1] && mask.v.c[1]) {
+			return true;
+		}
+		return false;
+	}
+
+	inline bool allTrue() {
+		if (!v.c[0]) {
+			return false;
+		}
+		if (!v.c[1]) {
+			return false;
+		}
+		return true;
+	}
+
+	inline VectorU8_2D operator!() {
+		VectorU8_2D ret;
+		ret.v.c[0] = !v.c[0];
+		ret.v.c[1] = !v.c[1];
+		return ret;
+	}
+
+	inline VectorU8_2D *bitNot() {
+		v.c[0] = !v.c[0];
+		v.c[1] = !v.c[1];
+		return this;
+	}
+
+	inline VectorU8_2D operator&(VectorU8_2D o) {
+		VectorU8_2D ret;
+		ret.v.c[0] = v.c[0] & o.v.c[0];
+		ret.v.c[1] = v.c[1] & o.v.c[1];
+		return ret;
+	}
+
+	inline VectorU8_2D *bitAnd(VectorU8_2D o) {
+		v.c[0] = v.c[0] & o.v.c[0];
+		v.c[1] = v.c[1] & o.v.c[1];
+		return this;
+	}
+
+	inline VectorU8_2D operator&&(VectorU8_2D o) {
+		VectorU8_2D ret;
+		ret.v.c[0] = v.c[0] && o.v.c[0];
+		ret.v.c[1] = v.c[1] && o.v.c[1];
+		return ret;
+	}
+
+	inline VectorU8_2D *boolAnd(VectorU8_2D o) {
+		v.c[0] = v.c[0] && o.v.c[0];
+		v.c[1] = v.c[1] && o.v.c[1];
+		return this;
+	}
+};
+
+
 class VectorU8_4D {
 public:
 	u8vec4 v;
@@ -493,99 +672,6 @@ public:
 	}
 };
 
-
-class VectorU8_2D {
-public:
-	u8vec2 v{};
-
-	inline VectorU8_2D() {
-		v.c[0] = 0;
-		v.c[1] = 0;
-	}
-
-	inline explicit VectorU8_2D(const u8vec2 &vec) {
-		v = vec;
-	}
-
-
-	inline VectorU8_2D(uint8_t a, uint8_t b) {
-		v.c[0] = a;
-		v.c[1] = b;
-	}
-
-	inline uint8_t &operator[](uint32_t location) {
-		return v.c[location];
-	}
-
-	inline bool anyTrue() {
-		if (v.c[0]) {
-			return true;
-		}
-		if (v.c[1]) {
-			return true;
-		}
-		return false;
-	}
-
-	inline bool anyTrue(VectorU8_2D mask) {
-		if (v.c[0] && mask.v.c[0]) {
-			return true;
-		}
-		if (v.c[1] && mask.v.c[1]) {
-			return true;
-		}
-		return false;
-	}
-
-	inline bool allTrue() {
-		if (!v.c[0]) {
-			return false;
-		}
-		if (!v.c[1]) {
-			return false;
-		}
-		return true;
-	}
-
-	inline VectorU8_2D operator!() {
-		VectorU8_2D ret;
-		ret.v.c[0] = !v.c[0];
-		ret.v.c[1] = !v.c[1];
-		return ret;
-	}
-
-	inline VectorU8_2D *bitNot() {
-		v.c[0] = !v.c[0];
-		v.c[1] = !v.c[1];
-		return this;
-	}
-
-	inline VectorU8_2D operator&(VectorU8_2D o) {
-		VectorU8_2D ret;
-		ret.v.c[0] = v.c[0] & o.v.c[0];
-		ret.v.c[1] = v.c[1] & o.v.c[1];
-		return ret;
-	}
-
-	inline VectorU8_2D *bitAnd(VectorU8_2D o) {
-		v.c[0] = v.c[0] & o.v.c[0];
-		v.c[1] = v.c[1] & o.v.c[1];
-		return this;
-	}
-
-	inline VectorU8_2D operator&&(VectorU8_2D o) {
-		VectorU8_2D ret;
-		ret.v.c[0] = v.c[0] && o.v.c[0];
-		ret.v.c[1] = v.c[1] && o.v.c[1];
-		return ret;
-	}
-
-	inline VectorU8_2D *boolAnd(VectorU8_2D o) {
-		v.c[0] = v.c[0] && o.v.c[0];
-		v.c[1] = v.c[1] && o.v.c[1];
-		return this;
-	}
-};
 
 class VectorU8_8D {
 public:
@@ -781,6 +867,35 @@ public:
 		return this;
 	}
 };
+
+
+class VectorDouble1D {
+public:
+	doublevec1 v{};
+
+	inline VectorDouble1D *set(double value, VectorU8_1D mask) {
+		if (mask.v.c) { v.c = value; }
+		return this;
+	}
+
+	inline VectorDouble1D(const double *const values) {
+		v.c = values[0];
+	}
+
+	inline VectorDouble1D() {
+		v.c = 0.0f;
+	}
+
+	inline VectorDouble1D(double value) {
+		v.c = value;
+	}
+
+	inline double &operator[]([[maybe_unused]]uint32_t location) {
+		return v.c;
+	}
+
+};
+
 
 class VectorDouble2D {
 public:
@@ -1070,24 +1185,24 @@ public:
 		v.avx = _mm256_max_pd(v.avx, one.avx);
 		v.avx = _mm256_min_pd(v.avx, _mm256_setzero_pd());
 #else
-		if (v.c[0] > 1) UNLIKELY{
+		if (v.c[0] > 1) UNLIKELY {
 			v.c[0] = 1;
-		} else if (v.c[0] < 0) UNLIKELY{
+		} else if (v.c[0] < 0) UNLIKELY {
 			v.c[0] = 0;
 		}
-		if (v.c[1] > 1) UNLIKELY{
+		if (v.c[1] > 1) UNLIKELY {
 			v.c[1] = 1;
-		} else if (v.c[1] < 0) UNLIKELY{
+		} else if (v.c[1] < 0) UNLIKELY {
 			v.c[1] = 0;
 		}
-		if (v.c[2] > 1) UNLIKELY{
+		if (v.c[2] > 1) UNLIKELY {
 			v.c[2] = 1;
-		} else if (v.c[2] < 0) UNLIKELY{
+		} else if (v.c[2] < 0) UNLIKELY {
 			v.c[2] = 0;
 		}
-		if (v.c[3] > 1) UNLIKELY{
+		if (v.c[3] > 1) UNLIKELY {
 			v.c[3] = 1;
-		} else if (v.c[3] < 0) UNLIKELY{
+		} else if (v.c[3] < 0) UNLIKELY {
 			v.c[3] = 0;
 		}
 #endif
@@ -1661,19 +1776,19 @@ public:
 
 #if defined(USE_AVX512)
 
-#define RECOMMENDED_COMPLEX_64_SIZE 8
-#define RECOMMENDED_COMPLEX_64_TYPE Array8Complex64
-#define RECOMMENDED_COMPLEX_64_MASK_TYPE VectorU8_8D
-#define RECOMMENDED_COMPLEX_64_VECTOR_TYPE VectorDouble8D
+#define MAX_COMPLEX_64_SIZE 8
+#define MAX_COMPLEX_64_TYPE Array8Complex64
+#define MAX_COMPLEX_64_MASK_TYPE VectorU8_8D
+#define MAX_COMPLEX_64_VECTOR_TYPE VectorDouble8D
 #define IDEAL_COMPLEX_64_SIZE 8
 #define IDEAL_COMPLEX_64_TYPE Array8Complex64
 #define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_8D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble8D
 
-#define RECOMMENDED_COMPLEX_32_SIZE 16
-#define RECOMMENDED_COMPLEX_32_TYPE Array8Complex32
-#define RECOMMENDED_COMPLEX_32_MASK_TYPE VectorU8_16D
-#define RECOMMENDED_COMPLEX_32_VECTOR_TYPE VectorDouble16D
+#define MAX_COMPLEX_32_SIZE 16
+#define MAX_COMPLEX_32_TYPE Array8Complex32
+#define MAX_COMPLEX_32_MASK_TYPE VectorU8_16D
+#define MAX_COMPLEX_32_VECTOR_TYPE VectorDouble16D
 #define IDEAL_COMPLEX_32_SIZE 16
 #define IDEAL_COMPLEX_32_TYPE Array8Complex32
 #define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_16D
@@ -1682,19 +1797,19 @@ public:
 
 #elif defined(USE_AVX)
 
-#define RECOMMENDED_COMPLEX_64_SIZE 8
-#define RECOMMENDED_COMPLEX_64_TYPE Array8Complex64
-#define RECOMMENDED_COMPLEX_64_MASK_TYPE VectorU8_8D
-#define RECOMMENDED_COMPLEX_64_VECTOR_TYPE VectorDouble8D
+#define MAX_COMPLEX_64_SIZE 8
+#define MAX_COMPLEX_64_TYPE Array8Complex64
+#define MAX_COMPLEX_64_MASK_TYPE VectorU8_8D
+#define MAX_COMPLEX_64_VECTOR_TYPE VectorDouble8D
 #define IDEAL_COMPLEX_64_SIZE 4
 #define IDEAL_COMPLEX_64_TYPE Array4Complex64
 #define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_4D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble4D
 
-#define RECOMMENDED_COMPLEX_32_SIZE 16
-#define RECOMMENDED_COMPLEX_32_TYPE Array8Complex32
-#define RECOMMENDED_COMPLEX_32_MASK_TYPE VectorU8_16D
-#define RECOMMENDED_COMPLEX_32_VECTOR_TYPE VectorDouble16D
+#define MAX_COMPLEX_32_SIZE 16
+#define MAX_COMPLEX_32_TYPE Array8Complex32
+#define MAX_COMPLEX_32_MASK_TYPE VectorU8_16D
+#define MAX_COMPLEX_32_VECTOR_TYPE VectorDouble16D
 #define IDEAL_COMPLEX_32_SIZE 8
 #define IDEAL_COMPLEX_32_TYPE Array4Complex34
 #define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_8D
@@ -1703,20 +1818,20 @@ public:
 
 #elif defined(USE_SSE) || defined(USE_NEON) || defined(USE_WASM_SIMD)
 
-#define RECOMMENDED_COMPLEX_64_SIZE 4
-#define RECOMMENDED_COMPLEX_64_TYPE Array4Complex64
-#define RECOMMENDED_COMPLEX_64_MASK_TYPE VectorU8_4D
-#define RECOMMENDED_COMPLEX_64_VECTOR_TYPE VectorDouble4D
+#define MAX_COMPLEX_64_SIZE 4
+#define MAX_COMPLEX_64_TYPE Array4Complex64
+#define MAX_COMPLEX_64_MASK_TYPE VectorU8_4D
+#define MAX_COMPLEX_64_VECTOR_TYPE VectorDouble4D
 #define IDEAL_COMPLEX_64_SIZE 2
 #define IDEAL_COMPLEX_64_TYPE Array2Complex64
 #define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_2D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble2D
 
 
-#define RECOMMENDED_COMPLEX_32_SIZE 8
-#define RECOMMENDED_COMPLEX_32_TYPE Array4Complex32
-#define RECOMMENDED_COMPLEX_32_MASK_TYPE VectorU8_8D
-#define RECOMMENDED_COMPLEX_32_VECTOR_TYPE VectorFloat8D
+#define MAX_COMPLEX_32_SIZE 8
+#define MAX_COMPLEX_32_TYPE Array4Complex32
+#define MAX_COMPLEX_32_MASK_TYPE VectorU8_8D
+#define MAX_COMPLEX_32_VECTOR_TYPE VectorFloat8D
 #define IDEAL_COMPLEX_32_SIZE 4
 #define IDEAL_COMPLEX_32_TYPE Array2Complex32
 #define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_4D
@@ -1725,21 +1840,20 @@ public:
 
 #else
 
-#error µARCH not supported // TODO solve
 
-#define RECOMMENDED_COMPLEX_64_SIZE 1
-#define RECOMMENDED_COMPLEX_64_TYPE Complex64
-#define RECOMMENDED_COMPLEX_64_MASK_TYPE bool
-#define RECOMMENDED_COMPLEX_64_VECTOR_TYPE double
+#define MAX_COMPLEX_64_SIZE 1
+#define MAX_COMPLEX_64_TYPE Complex64
+#define MAX_COMPLEX_64_MASK_TYPE VectorU8_1D
+#define MAX_COMPLEX_64_VECTOR_TYPE VectorDouble1D
 #define IDEAL_COMPLEX_64_SIZE 1
 #define IDEAL_COMPLEX_64_TYPE Complex64
-#define IDEAL_COMPLEX_64_MASK_TYPE bool
-#define IDEAL_COMPLEX_64_VECTOR_TYPE double
+#define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_1D
+#define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble1D
 
-#define RECOMMENDED_COMPLEX_32_SIZE 1
-#define RECOMMENDED_COMPLEX_32_TYPE Complex32
-#define RECOMMENDED_COMPLEX_32_MASK_TYPE bool
-#define RECOMMENDED_COMPLEX_32_VECTOR_TYPE float
+#define MAX_COMPLEX_32_SIZE 1
+#define MAX_COMPLEX_32_TYPE Complex32
+#define MAX_COMPLEX_32_MASK_TYPE bool
+#define MAX_COMPLEX_32_VECTOR_TYPE float
 #define IDEAL_COMPLEX_32_SIZE 1
 #define IDEAL_COMPLEX_32_TYPE Complex32
 #define IDEAL_COMPLEX_32_MASK_TYPE bool
@@ -1780,6 +1894,14 @@ public:
 		return this;
 	}
 
+	inline Complex64 *add(Complex64 a, VectorU8_1D mask) {
+		if (mask.v.c) {
+			c.c[1] += a.c.c[1];
+			c.c[0] += a.c.c[0];
+		}
+		return this;
+	}
+
 	inline Complex64 operator+(Complex64 a) {
 		Complex64 ret(c.c[0] + a.c.c[0], c.c[1] + a.c.c[1]);
 		return ret;
@@ -1803,6 +1925,21 @@ public:
 		c.c[0] = d1;
 		c.c[1] = d2;
 		return this;
+	}
+
+
+	inline Complex64 *multiply(const Complex64 &a, const VectorU8_1D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c) {
+			d1 = c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1];
+			d2 = c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0];
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+
+
 	}
 
 	inline Complex64 operator*(Complex64 a) {
@@ -1891,7 +2028,199 @@ public:
 		return *this;
 	}
 
+
 };
+
+class Array2Complex64 {
+public:
+	doublevec2 r{};
+	doublevec2 c{};
+
+	inline VectorDouble2D real() {
+		return VectorDouble2D(r.c);
+	}
+
+	inline VectorDouble2D complex() {
+		return VectorDouble2D(c.c);
+	}
+
+	inline Complex64 operator[](uint64_t location) {
+		return Complex64(r.c[location], c.c[location]);
+	}
+
+	inline void set(uint64_t location, Complex64 value) {
+		r.c[location] = value.c.c[0];
+		c.c[location] = value.c.c[1];
+	}
+
+	inline Array2Complex64 *add(Array2Complex64 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+		return this;
+	}
+
+	inline Array2Complex64 operator+(Array2Complex64 a) {
+		Array2Complex64 ret;
+		ret.c.c[0] = c.c[0] + a.c.c[0];
+		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.r.c[0] = r.c[0] + a.r.c[0];
+		ret.r.c[1] = r.c[1] + a.r.c[1];
+		return ret;
+	}
+
+	inline Array2Complex64 operator+(Complex64 a) {
+		Array2Complex64 ret;
+		ret.c.c[0] = c.c[0] + a.c.c[0];
+		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.r.c[0] = r.c[0] + a.c.c[0];
+		ret.r.c[1] = r.c[1] + a.c.c[0];
+		return ret;
+	}
+
+	inline Array2Complex64 *add(Array2Complex64 a, VectorU8_2D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] += a.c.c[0];
+			r.c[0] += a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] += a.c.c[1];
+			r.c[1] += a.r.c[1];
+		}
+		return this;
+	}
+
+	inline Array2Complex64 *add(Complex64 a, VectorU8_2D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] += a.c.c[1];
+			r.c[0] += a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] += a.c.c[1];
+			r.c[1] += a.c.c[0];
+		}
+		return this;
+	}
+
+	inline Array2Complex64 operator*(const Array2Complex64 &a) {
+		Array2Complex64 ret;
+		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+
+
+		return ret;
+	}
+
+	inline Array2Complex64 *multiply(const Array2Complex64 &a) {
+		double d1;
+		double d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 operator*(const Complex64 &a) {
+		Array2Complex64 ret;
+		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+
+		return ret;
+	}
+
+
+	inline Array2Complex64 *multiply(const Complex64 &a) {
+		double d1;
+		double d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 *multiply(const Complex64 &a, const VectorU8_2D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+
+
+	}
+
+	inline Array2Complex64 *multiply(const Array2Complex64 &a, const VectorU8_2D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline VectorDouble2D abs() {
+		VectorDouble2D ret;
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
+		return ret;
+	}
+
+	inline VectorU8_2D abs_gt(double a) {
+		VectorU8_2D ret;
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		return ret;
+	}
+
+	inline VectorU8_2D abs_lt(double a) {
+		VectorU8_2D ret;
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		return ret;
+	}
+
+	inline VectorU8_2D abs_eq(double a) {
+		VectorU8_2D ret;
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		return ret;
+	}
+};
+
 
 class Array4Complex64 {
 public:
@@ -2168,196 +2497,6 @@ public:
 	}
 };
 
-
-class Array2Complex64 {
-public:
-	doublevec2 r{};
-	doublevec2 c{};
-
-	inline VectorDouble2D real() {
-		return VectorDouble2D(r.c);
-	}
-
-	inline VectorDouble2D complex() {
-		return VectorDouble2D(c.c);
-	}
-
-	inline Complex64 operator[](uint64_t location) {
-		return Complex64(r.c[location], c.c[location]);
-	}
-
-	inline void set(uint64_t location, Complex64 value) {
-		r.c[location] = value.c.c[0];
-		c.c[location] = value.c.c[1];
-	}
-
-	inline Array2Complex64 *add(Array2Complex64 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		r.c[0] += a.r.c[0];
-		r.c[1] += a.r.c[1];
-		return this;
-	}
-
-	inline Array2Complex64 operator+(Array2Complex64 a) {
-		Array2Complex64 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[0];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.r.c[0] = r.c[0] + a.r.c[0];
-		ret.r.c[1] = r.c[1] + a.r.c[1];
-		return ret;
-	}
-
-	inline Array2Complex64 operator+(Complex64 a) {
-		Array2Complex64 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[0];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.r.c[0] = r.c[0] + a.c.c[0];
-		ret.r.c[1] = r.c[1] + a.c.c[0];
-		return ret;
-	}
-
-	inline Array2Complex64 *add(Array2Complex64 a, VectorU8_2D mask) {
-		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[0];
-			r.c[0] += a.r.c[0];
-		}
-		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
-			r.c[1] += a.r.c[1];
-		}
-		return this;
-	}
-
-	inline Array2Complex64 *add(Complex64 a, VectorU8_2D mask) {
-		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[1];
-			r.c[0] += a.c.c[0];
-		}
-		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
-			r.c[1] += a.c.c[0];
-		}
-		return this;
-	}
-
-	inline Array2Complex64 operator*(const Array2Complex64 &a) {
-		Array2Complex64 ret;
-		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
-
-
-		return ret;
-	}
-
-	inline Array2Complex64 *multiply(const Array2Complex64 &a) {
-		double d1;
-		double d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-		r.c[0] = d1;
-		c.c[0] = d2;
-
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
-		r.c[1] = d1;
-		c.c[1] = d2;
-		return this;
-	}
-
-	inline Array2Complex64 operator*(const Complex64 &a) {
-		Array2Complex64 ret;
-		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
-
-		return ret;
-	}
-
-
-	inline Array2Complex64 *multiply(const Complex64 &a) {
-		double d1;
-		double d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
-		r.c[1] = d1;
-		c.c[1] = d2;
-		return this;
-	}
-
-	inline Array2Complex64 *multiply(const Complex64 &a, const VectorU8_2D &mask) {
-		double d1;
-		double d2;
-		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-			r.c[0] = d1;
-			c.c[0] = d2;
-		}
-		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
-			r.c[1] = d1;
-			c.c[1] = d2;
-		}
-		return this;
-
-
-	}
-
-	inline Array2Complex64 *multiply(const Array2Complex64 &a, const VectorU8_2D &mask) {
-		double d1;
-		double d2;
-		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-			r.c[0] = d1;
-			c.c[0] = d2;
-		}
-		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
-			r.c[1] = d1;
-			c.c[1] = d2;
-		}
-		return this;
-	}
-
-	inline VectorDouble2D abs() {
-		VectorDouble2D ret;
-		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
-		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
-		return ret;
-	}
-
-	inline VectorU8_2D abs_gt(double a) {
-		VectorU8_2D ret;
-		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		return ret;
-	}
-
-	inline VectorU8_2D abs_lt(double a) {
-		VectorU8_2D ret;
-		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		return ret;
-	}
-
-	inline VectorU8_2D abs_eq(double a) {
-		VectorU8_2D ret;
-		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		return ret;
-	}
-};
 
 class Array8Complex64 {
 public:
