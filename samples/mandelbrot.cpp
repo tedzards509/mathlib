@@ -94,6 +94,7 @@ int main() {
 			if (!(finished.allTrue())) {
 				for (; i < accuracy; ++i) {
 					complex64_Z.multiply(complex64_Z, !finished)->add(complex64_C, !finished);
+					//complex64_Z = (complex64_Z * complex64_Z) + complex64_C; Identical result but slower on my machine
 					finished = complex64_Z.abs_gt(2);
 					nowFinished = finished && !alreadyFinished;
 					if (nowFinished.anyTrue()) {

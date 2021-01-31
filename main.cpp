@@ -226,6 +226,18 @@ int main() {
 		}
 		std::cout << std::endl;
 	}
+
+	Complex64 c1(0.5, 0.3);
+	Complex64 c2(0.5, 0.3);
+	c1.pow(2.5);
+	c2.multiply(c2);
+
+	std::cout << c1.real() << " + " << c1.imaginary() << " i : " << c2.real() << " + " << c2.imaginary() << " i"
+			  << std::endl;
+
+	std::cout << AML::mapLinear(8.0, 9.0, 6.0, 4.0, 0.0) << std::endl;
+	std::cout << AML::mapNonLinear(8.0, 9.0, 6.0, 4.0, 0.0, 1.0) << std::endl;
+
 	return 0;
 
 }
