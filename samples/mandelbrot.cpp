@@ -1,6 +1,8 @@
 //
 // Created by af on 26.01.21.
 //
+#define AML_USE_STD_COMPLEX
+
 #include <stdlib.h>
 #include <stdint.h>
 #include "../amathlib.h"
@@ -37,8 +39,37 @@ int main() {
 	std::cin >> height;
 	std::cout << "accuracy recommended 100000" << std::endl;
 	std::cin >> accuracy;
-	uint32_t begin = getTime();
-	uint32_t end = 0;
+	uint32_t begin;
+	uint32_t end;
+
+	begin = getTime();
+	for (int x = 0; x < height; x++) {
+		for (int y = 0; y < width; y++) {
+			std::complex<double> c(((double) x) / ((double) height / 2.0f) - 1.5f,
+								   ((double) y) / ((double) width / 2.0f) - 1.0f);
+			std::complex<double> z = c;
+			int i = 0;
+			int result = accuracy;
+			for (; i < accuracy; ++i) {
+				z = z * z + c;
+				if (norm(z) > 4) {
+					result = i;
+					break;
+				}
+			}
+			if (result >= accuracy) {
+				std::cout << "#";
+			} else {
+				std::cout << " ";
+			}
+		}
+		std::cout << "\n";
+	}
+	end = getTime();
+
+	std::cout << "Time 0 : " << ((double) (end - begin)) / 1000.0f << std::endl;
+
+	begin = getTime();
 	for (int x = 0; x < height; x++) {
 		for (int y = 0; y < width; y++) {
 			Complex64 c(((double) x) / ((double) height / 2.0f) - 1.5f, ((double) y) / ((double) width / 2.0f) - 1.0f);
