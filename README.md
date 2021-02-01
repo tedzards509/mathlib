@@ -6,8 +6,8 @@ should be fast. It is header-only making it easy to
 integrate into different projects, build processes and
 platforms.
 
-please don't contribute for now, at least for bindings until
-the design is thought through
+please don't contribute to the bindings until the design is
+thought through
 
 A vector can represent
 
@@ -34,7 +34,7 @@ supports multiple precisions like
 
 - signed integer i8, i16, i32, i64
 - unsigned integer u8, u16, u32, u64
-- float at least 32, 64, 80, 128 bit
+- float at least 32, 64 bit
 
 The feature level for each type(a combination of precision
 and an amount like vec4f32) can differ, I don't use
@@ -46,3 +46,11 @@ detect the right vectorisation method.
 Integrate the aml_lua_binding.cpp into your c++ application
 if you want to. For simple or trivial functions(like
 addition) the aml version is slower.
+
+This library does NOT guarantee correctness of the result.
+It ignores IEEE 754 edge cases(overflow, INF, NaN, div 0,
+sqrt(-x), consistency, ...) in favor of speed. In the future
+this library may add a safe math flag. Do not use this
+library in safety critical mechanisms(encryption, aerospace,
+automotive). This library has undefined behavior(e.g. an
+internal division by 0) and it's not documented.

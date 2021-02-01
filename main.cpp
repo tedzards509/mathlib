@@ -1,6 +1,9 @@
 
 //#define USE_SSE42
 
+
+#define AML_USE_STD_COMPLEX
+
 #include "amathlib.h"
 #include <iostream>
 
@@ -232,7 +235,30 @@ int main() {
 	c1.pow(2.5);
 	c2.multiply(c2);
 
-	std::cout << c1.real() << " + " << c1.imaginary() << " i : " << c2.real() << " + " << c2.imaginary() << " i"
+	std::cout << c1 << " : " << c2.real() << " + " << c2.imaginary() << " i"
+			  << std::endl;
+	Complex64 c3(0.5, 0.3);
+	std::complex<double> sc3(0.5, 0.3);
+	c3.ln();
+	sc3 = std::log(sc3);
+
+	std::cout << "" << c3 << " : " << sc3.real() << " + " << sc3.imag() << " i"
+			  << std::endl;
+
+	c3.log();
+	sc3 = std::log(sc3);
+
+	std::cout << c3 << " : " << sc3.real() << " + " << sc3.imag() << " i"
+			  << std::endl;
+
+	Complex64 c4(0.9, 0.1);
+	std::complex<double> sc4(0.9, 0.1);
+	Complex64 c5(0.5, 0.3);
+	std::complex<double> sc5(0.5, 0.3);
+	c4.pow(c5);
+	sc4 = pow(sc4, sc5);
+
+	std::cout << c4.real() << " + " << c4.imaginary() << " i : " << sc4.real() << " + " << sc4.imag() << " i"
 			  << std::endl;
 
 	std::cout << AML::mapLinear(8.0, 9.0, 6.0, 4.0, 0.0) << std::endl;

@@ -5,6 +5,19 @@
 #ifndef MATH_LIB_A_MATH_LIB_H
 #define MATH_LIB_A_MATH_LIB_H
 
+#if defined(AML_USE_STD_COMPLEX)
+
+#include <complex>
+
+#endif
+
+#include <string>
+#include <sstream>
+
+#define AML_SAVE_MATH
+
+#define AML_LN10 2.3025850929940456840179914546843642076011014886287729760333279009675726096773524802359972050895982983419677840422862486334095254
+
 #define DEBUG_TO_INDEX(row, column) ((column - 1) * 4 + (row-1))
 
 //#define USE_AVX512
@@ -380,6 +393,14 @@ namespace AML {
 
 	inline double interpolate(const double val1, const double val2, const double val3, const double ratio) {
 		return ratio * (ratio * (val1 - val2 - val2 + val3) + val2 + val2 - val3 - val3) + val3;
+	}
+
+	inline double arithmeticMean(double a1, double a2) {
+#if defined(AML_SAVE_MATH)
+		return a1 + (a2 - a1) / 2;
+#else
+		return (a1 + a2) / 2;
+#endif
 	}
 }
 
@@ -1945,7 +1966,7 @@ public:
 	doublevec2 c{};
 
 
-	inline Complex64(double real, double img) {
+	inline constexpr Complex64(const double real, const double img) {
 		c.c[0] = real;
 		c.c[1] = img;
 	}
@@ -1954,6 +1975,20 @@ public:
 		c.c[0] = values[0];
 		c.c[1] = values[1];
 	}
+
+	inline constexpr Complex64(double real) {
+		c.c[0] = real;
+		c.c[1] = 0.0;
+	}
+
+#if defined(AML_USE_STD_COMPLEX)
+
+	inline Complex64(std::complex<double> sc) {
+		c.c[0] = sc.real();
+		c.c[1] = sc.imag();
+	}
+
+#endif
 
 	inline Complex64() {
 		c.c[0] = 0;
@@ -1982,6 +2017,12 @@ public:
 	inline Complex64 operator+(Complex64 a) {
 		Complex64 ret(c.c[0] + a.c.c[0], c.c[1] + a.c.c[1]);
 		return ret;
+	}
+
+
+	inline void operator+=(Complex64 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
 	}
 
 	inline Complex64 *subtract(Complex64 a) {
@@ -2024,6 +2065,31 @@ public:
 		return ret;
 	}
 
+	inline Complex64 *square() {
+		double d1 = c.c[0] * c.c[0] - c.c[1] * c.c[1];
+		double d2 = c.c[0] * c.c[1] + c.c[1] * c.c[0];
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *square(const VectorU8_1D mask) {
+		if (mask.v.c) {
+			double d1 = c.c[0] * c.c[0] - c.c[1] * c.c[1];
+			double d2 = c.c[0] * c.c[1] + c.c[1] * c.c[0];
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex64 operator/(Complex64 a) {
+		Complex64 ret;
+		ret.c.c[0] = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.c.c[1] = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		return ret;
+	}
+
 	inline Complex64 *divide(Complex64 a) {
 		double d1 = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		double d2 = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
@@ -2050,6 +2116,24 @@ public:
 	inline Complex64 *sin() {
 		double d1 = ::sin(c.c[0]) * ::cosh(c.c[1]);
 		double d2 = ::cos(c.c[1]) * ::sinh(c.c[0]);
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *cos() {
+		double d1 = ::cos(c.c[0]) * ::cosh(c.c[1]);
+		double d2 = -::sin(c.c[1]) * ::sinh(c.c[0]);
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *tan() {
+		double d1 = ::sin(c.c[0] + c.c[0]) / (::cos(c.c[0] + c.c[0]) * ::cosh(c.c[1] + c.c[1]));
+		double d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(c.c[0] + c.c[0]) * ::cosh(c.c[1] + c.c[1]));
 
 		c.c[0] = d1;
 		c.c[1] = d2;
@@ -2085,6 +2169,20 @@ public:
 		return this;
 	}
 
+	inline Complex64 *pow(Complex64 n) {
+		double d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+		double d2 = ::atan2(c.c[1], c.c[0]);
+		double d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		double d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		double d5 = d3 * ::cos(d4);
+		double d6 = d3 * ::sin(d4);
+
+
+		c.c[0] = d5;
+		c.c[1] = d6;
+		return this;
+	}
+
 	inline Complex64 *pow(double n, const VectorU8_1D &mask) {
 		if (mask.v.c) {
 			double d1 = ::pow(c.c[0] * c.c[0] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], c.c[0]));
@@ -2111,6 +2209,44 @@ public:
 		return a * a == c.c[0] * c.c[0] + c.c[1] * c.c[1];
 	}
 
+	inline bool abs_gt(Complex64 a) {
+		return a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1] < c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_lt(Complex64 a) {
+		return a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1] > c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_eq(Complex64 a) {
+		return a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1] == c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+
+	inline Complex64 *ln() {
+		double d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+		double d2 = ::atan2(c.c[1], c.c[0]);
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *log() {
+		double d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+		double d2 = ::atan2(c.c[1], c.c[0]);
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *log10() {
+		double d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / (2 * AML_LN10);
+		double d2 = ::atan2(c.c[1], c.c[0]) / AML_LN10;
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+
 	inline double imaginary() {
 		return c.c[1];
 	}
@@ -2119,12 +2255,79 @@ public:
 		return c.c[0];
 	}
 
+	inline double angle() {
+		return ::atan(c.c[1] / c.c[0]);
+	}
+
+	inline double length() {
+		return ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1]);
+	}
+
+	inline Complex64 *polar(double length, double angle) {
+		c.c[0] = length * ::cos(angle);
+		c.c[1] = length * ::sin(angle);
+		return this;
+	}
+
 	inline Complex64 operator[]([[maybe_unused]]uint64_t location) {
 		return *this;
 	}
 
 
 };
+
+inline Complex64 operator+(const double &lhs, const Complex64 &rhs) {
+	Complex64 ret(lhs + rhs.c.c[0], 0.0 + rhs.c.c[1]);
+	return ret;
+}
+
+inline std::string operator<<(std::string &lhs, const Complex64 &rhs) {
+	std::ostringstream string;
+	string << lhs << rhs.c.c[0] << " + " << rhs.c.c[1] << "i";
+	return string.str();
+}
+
+inline std::string operator<<(const char *lhs, const Complex64 &rhs) {
+	std::ostringstream string;
+	string << lhs << rhs.c.c[0] << " + " << rhs.c.c[1] << "i";
+	return string.str();
+}
+//basic_ostream<char, std::char_traits<char>>
+
+
+template<class charT, class traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &o, const Complex64 &x) {
+	std::basic_ostringstream<charT, traits> s;
+	s.flags(o.flags());
+	s.imbue(o.getloc());
+	s.precision(o.precision());
+	s << x.c.c[0] << " + " << x.c.c[1] << "i";
+	return o << s.str();
+}
+
+inline Complex64 operator-(const double &lhs, const Complex64 &rhs) {
+	Complex64 ret(lhs - rhs.c.c[0], 0.0 - rhs.c.c[1]);
+	return ret;
+}
+
+constexpr Complex64 operator ""_i(long double d) {
+	return Complex64(0.0f, (double) d);
+}
+
+constexpr Complex64 operator ""_i(unsigned long long d) {
+	return Complex64(0.0f, (double) d);
+}
+
+#if defined(AML_USE_STD_COMPLEX)
+
+std::complex<double> toStdComplex(Complex64 a) {
+	std::complex<double> ret(a.c.c[0], a.c.c[1]);
+	return ret;
+}
+
+#endif
+
 
 class Array2Complex64 {
 public:
@@ -2294,6 +2497,39 @@ public:
 		}
 		return this;
 	}
+
+	inline Array2Complex64 *square() {
+		double d1;
+		double d2;
+		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 *square(const VectorU8_2D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
 
 	inline Array2Complex64 *exp() {
 		double d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
@@ -2661,6 +2897,58 @@ public:
 		if (mask.v.c[3]) {
 			d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
 			d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex64 *square() {
+		double d1;
+		double d2;
+		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
+		d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
+		d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex64 *square(const VectorU8_4D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
+			d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
+			d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
 			r.c[3] = d1;
 			c.c[3] = d2;
 		}
@@ -3263,6 +3551,103 @@ public:
 		if (mask.v.c[7]) {
 			d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
 			d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex64 *square() {
+		double d1;
+		double d2;
+		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
+		d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
+		d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = r.c[4] * r.c[4] - c.c[4] * c.c[4];
+		d2 = r.c[4] * c.c[4] + c.c[4] * r.c[4];
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = r.c[5] * r.c[5] - c.c[5] * c.c[5];
+		d2 = r.c[5] * c.c[5] + c.c[5] * r.c[5];
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = r.c[6] * r.c[6] - c.c[6] * c.c[6];
+		d2 = r.c[6] * c.c[6] + c.c[6] * r.c[6];
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
+		d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
+		r.c[7] = d1;
+		c.c[7] =
+				d2;
+		return this;
+	}
+
+	inline Array8Complex64
+
+	*
+
+	square(const VectorU8_8D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
+			d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
+			d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = r.c[4] * r.c[4] - c.c[4] * c.c[4];
+			d2 = r.c[4] * c.c[4] + c.c[4] * r.c[4];
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = r.c[5] * r.c[5] - c.c[5] * c.c[5];
+			d2 = r.c[5] * c.c[5] + c.c[5] * r.c[5];
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = r.c[6] * r.c[6] - c.c[6] * c.c[6];
+			d2 = r.c[6] * c.c[6] + c.c[6] * r.c[6];
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
+			d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
 			r.c[7] = d1;
 			c.c[7] = d2;
 		}
