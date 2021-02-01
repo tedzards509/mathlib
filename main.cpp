@@ -1,5 +1,5 @@
 
-//#define USE_SSE42
+#define USE_FMA
 
 
 #define AML_USE_STD_COMPLEX
@@ -26,6 +26,12 @@ int main() {
 
 	std::cout << "size : " << sizeof(VectorDouble4D) << " align : " << alignof(VectorDouble4D) << std::endl;
 	std::cout << "size double : " << sizeof(double) << " size float : " << sizeof(float) << std::endl;
+	std::cout << "size : " << sizeof(Complex32) << " align : " << alignof(Complex32) << std::endl;
+	std::cout << "size : " << sizeof(Array2Complex32) << " align : " << alignof(Array2Complex32) << std::endl;
+	std::cout << "size : " << sizeof(Array4Complex32) << " align : " << alignof(Array4Complex32) << std::endl;
+	std::cout << "size : " << sizeof(Array8Complex32) << " align : " << alignof(Array8Complex32) << std::endl;
+
+
 	VectorDouble4D vector;
 	VectorDouble4D vector2(0.4, 21.0, 2.4, 2.5);
 	vector += vector2;
@@ -263,6 +269,12 @@ int main() {
 
 	std::cout << AML::mapLinear(8.0, 9.0, 6.0, 4.0, 0.0) << std::endl;
 	std::cout << AML::mapNonLinear(8.0, 9.0, 6.0, 4.0, 0.0, 1.0) << std::endl;
+
+	Array8Complex64 abc(2.0 + 3_i);
+
+	abc = 1 / abc;
+
+	std::cout << abc << std::endl;
 
 	return 0;
 

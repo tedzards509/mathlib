@@ -29,7 +29,7 @@ if (UNIX)
         set(CMAKE_CXX_FLAGS_RELEASE "-O3 -mcpu=cortex-a72 -ffast-math")
     elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
         set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-        set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG -O0 -march=native")
+        set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG -O3 -ffast-math -march=native")
         set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -ffast-math")
     else ()
 

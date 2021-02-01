@@ -2,6 +2,7 @@
 // Created by af on 26.01.21.
 //
 #define AML_USE_STD_COMPLEX
+
 #include <stdlib.h>
 #include <stdint.h>
 #include "../amathlib.h"
@@ -33,11 +34,11 @@ int height = 80;          // example values
 int accuracy = 100000;    // example values way to high, just to get useful timing
 int main() {
 	std::cout << "width recommended 250" << std::endl;
-	std::cin >> width;
+	//std::cin >> width;
 	std::cout << "height recommended 80" << std::endl;
-	std::cin >> height;
+	//std::cin >> height;
 	std::cout << "accuracy recommended 100000" << std::endl;
-	std::cin >> accuracy;
+	//std::cin >> accuracy;
 	uint32_t begin;
 	uint32_t end;
 
@@ -101,9 +102,9 @@ int main() {
 			IDEAL_COMPLEX_64_TYPE complex64_C;
 			IDEAL_COMPLEX_64_TYPE complex64_Z;
 			for (int index = 0; index < IDEAL_COMPLEX_64_SIZE; index++) {
-				complex64_C.set(index, Complex64(((double) x) / ((double) height / 2.0f) - 1.5f,
-												 (((double) y * IDEAL_COMPLEX_64_SIZE + index) /
-												  ((double) width / 2.0f)) - 1.0f));
+				complex64_C.set(index, Complex64(AML::mapLinear(x, 0.0, (double) height, -1.5, 0.5),
+												 AML::mapLinear(y * IDEAL_COMPLEX_64_SIZE + index, 0.0, (double) width,
+																-1.0, 1.0)));
 			}
 			complex64_Z = complex64_C;
 			IDEAL_COMPLEX_64_VECTOR_TYPE result(accuracy);
@@ -130,7 +131,6 @@ int main() {
 					if (nowFinished.anyTrue()) {
 						alreadyFinished = finished;
 						result.set(i, nowFinished);
-
 					}
 					if (finished.allTrue()) {
 						break;

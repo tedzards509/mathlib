@@ -254,6 +254,43 @@ union doublevec1 {
 	double c;
 };
 
+
+union floatvec4 {
+#ifdef USE_SSE
+	__m128 sse;
+#endif
+#ifdef USE_NEON
+	float32x4_t neon;
+#endif
+	double c[4];
+};
+
+union floatvec8 {
+#ifdef USE_AVX
+	__m256 avx;
+#endif
+#ifdef USE_SSE
+	__m128 sse[2];
+#endif
+#ifdef USE_NEON
+	float32x4_t neon[2];
+#endif
+	double c[8];
+};
+
+
+union floatvec2 {
+#ifdef USE_NEON
+	float32x2_t neon;
+#endif
+	double c[2];
+};
+
+union floatvec1 {
+	double c;
+};
+
+
 union u8vec1 { // limited use
 	uint8_t c;
 };
@@ -1960,7 +1997,6 @@ public:
 
 #endif
 
-
 class Complex64 {
 public:
 	doublevec2 c{};
@@ -2000,6 +2036,7 @@ public:
 		c.c[1] = value.c.c[1];
 	}
 
+//add sub
 	inline Complex64 *add(Complex64 a) {
 		c.c[0] += a.c.c[0];
 		c.c[1] += a.c.c[1];
@@ -2007,7 +2044,7 @@ public:
 	}
 
 	inline Complex64 *add(Complex64 a, VectorU8_1D mask) {
-		if (mask.v.c) {
+		if (mask.v.c) LIKELY {
 			c.c[1] += a.c.c[1];
 			c.c[0] += a.c.c[0];
 		}
@@ -2019,10 +2056,20 @@ public:
 		return ret;
 	}
 
+	inline Complex64 operator-(Complex64 a) {
+		Complex64 ret(c.c[0] - a.c.c[0], c.c[1] - a.c.c[1]);
+		return ret;
+	}
+
 
 	inline void operator+=(Complex64 a) {
 		c.c[0] += a.c.c[0];
 		c.c[1] += a.c.c[1];
+	}
+
+	inline void operator-=(Complex64 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
 	}
 
 	inline Complex64 *subtract(Complex64 a) {
@@ -2031,12 +2078,21 @@ public:
 		return this;
 	}
 
+	inline Complex64 *subtract(Complex64 a, VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			c.c[0] -= a.c.c[0];
+			c.c[1] -= a.c.c[1];
+
+		}
+		return this;
+	}
+
 	inline Complex64 *conjugate() {
 		c.c[1] = -c.c[1];
 		return this;
 	}
 
-
+//mul
 	inline Complex64 *multiply(Complex64 a) {
 		double d1 = c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1];
 		double d2 = c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0];
@@ -2049,7 +2105,7 @@ public:
 	inline Complex64 *multiply(const Complex64 &a, const VectorU8_1D &mask) {
 		double d1;
 		double d2;
-		if (mask.v.c) {
+		if (mask.v.c) LIKELY {
 			d1 = c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1];
 			d2 = c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0];
 			c.c[0] = d1;
@@ -2065,6 +2121,19 @@ public:
 		return ret;
 	}
 
+	inline void operator*=(Complex64 a) {
+		double d1 = c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1];
+		double d2 = c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0];
+		c.c[0] = d1;
+		c.c[1] = d2;
+	}
+
+	inline void operator*=(double a) {
+		c.c[0] = c.c[0] * a;
+		c.c[1] = c.c[1] * a;
+	}
+
+
 	inline Complex64 *square() {
 		double d1 = c.c[0] * c.c[0] - c.c[1] * c.c[1];
 		double d2 = c.c[0] * c.c[1] + c.c[1] * c.c[0];
@@ -2074,7 +2143,7 @@ public:
 	}
 
 	inline Complex64 *square(const VectorU8_1D mask) {
-		if (mask.v.c) {
+		if (mask.v.c) LIKELY {
 			double d1 = c.c[0] * c.c[0] - c.c[1] * c.c[1];
 			double d2 = c.c[0] * c.c[1] + c.c[1] * c.c[0];
 			c.c[0] = d1;
@@ -2083,6 +2152,7 @@ public:
 		return this;
 	}
 
+//division
 	inline Complex64 operator/(Complex64 a) {
 		Complex64 ret;
 		ret.c.c[0] = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
@@ -2090,16 +2160,70 @@ public:
 		return ret;
 	}
 
+	inline void operator/=(Complex64 a) {
+		double d1 = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		c.c[0] = d1;
+		c.c[1] = d2;
+	}
+
+	inline void operator/=(double a) {
+		double d1 = c.c[0] / a;
+		double d2 = c.c[1] / a;
+		c.c[0] = d1;
+		c.c[1] = d2;
+	}
+
 	inline Complex64 *divide(Complex64 a) {
 		double d1 = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		double d2 = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-
 		c.c[0] = d1;
 		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 operator/(double a) {
+		Complex64 ret;
+		ret.c.c[0] = c.c[0] / a;
+		ret.c.c[1] = c.c[1] / a;
+		return ret;
+	}
+
+	inline Complex64 *divide(double a) {
+		double d1 = c.c[0] / a;
+		double d2 = c.c[1] / a;
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *divide(const double a, const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			double d1 = c.c[0] / a;
+			double d2 = c.c[1] / a;
+
+			c.c[0] = d1;
+			c.c[1] = d2;
+
+		}
 
 		return this;
 	}
 
+	inline Complex64 *divide(const Complex64 a, const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			double d1 = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			double d2 = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+
+			c.c[0] = d1;
+			c.c[1] = d2;
+
+		}
+
+		return this;
+	}
+
+//sqrt
 	inline Complex64 *sqrt() {
 		double d2 = ::sqrt((-c.c[0] + ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1])) / (2));
 		double d1;
@@ -2110,6 +2234,21 @@ public:
 		}
 		c.c[0] = d1;
 		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex64 *sqrt(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			double d2 = ::sqrt((-c.c[0] + ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1])) / (2));
+			double d1;
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(c.c[0]);
+			} else LIKELY {
+				d1 = c.c[1] / (2 * d2);
+			}
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
 		return this;
 	}
 
@@ -2140,6 +2279,36 @@ public:
 		return this;
 	}
 
+	inline Complex64 *sin(const VectorU8_1D mask) {
+		if (mask.v.c) {
+			double d1 = ::sin(c.c[0]) * ::cosh(c.c[1]);
+			double d2 = ::cos(c.c[1]) * ::sinh(c.c[0]);
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex64 *cos(const VectorU8_1D mask) {
+		if (mask.v.c) {
+			double d1 = ::cos(c.c[0]) * ::cosh(c.c[1]);
+			double d2 = -::sin(c.c[1]) * ::sinh(c.c[0]);
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex64 *tan(const VectorU8_1D mask) {
+		if (mask.v.c) {
+			double d1 = ::sin(c.c[0] + c.c[0]) / (::cos(c.c[0] + c.c[0]) * ::cosh(c.c[1] + c.c[1]));
+			double d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(c.c[0] + c.c[0]) * ::cosh(c.c[1] + c.c[1]));
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
 
 	inline Complex64 *exp() {
 		double d1 = ::exp(c.c[0]) * ::cos(c.c[1]);
@@ -2154,8 +2323,6 @@ public:
 	inline Complex64 *exp(double n) {
 		double d1 = ::pow(n, c.c[0]) * ::cos(c.c[1] * ::log(n));
 		double d2 = ::pow(n, c.c[0]) * ::sin(c.c[1] * ::log(n));
-
-
 		c.c[0] = d1;
 		c.c[1] = d2;
 		return this;
@@ -2176,19 +2343,31 @@ public:
 		double d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		double d5 = d3 * ::cos(d4);
 		double d6 = d3 * ::sin(d4);
-
-
 		c.c[0] = d5;
 		c.c[1] = d6;
 		return this;
 	}
 
 	inline Complex64 *pow(double n, const VectorU8_1D &mask) {
-		if (mask.v.c) {
+		if (mask.v.c) LIKELY {
 			double d1 = ::pow(c.c[0] * c.c[0] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], c.c[0]));
 			double d2 = ::pow(c.c[0] * c.c[0] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], c.c[0]));
 			c.c[0] = d1;
 			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex64 *pow(Complex64 n, const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			double d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+			double d2 = ::atan2(c.c[1], c.c[0]);
+			double d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			double d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			double d5 = d3 * ::cos(d4);
+			double d6 = d3 * ::sin(d4);
+			c.c[0] = d5;
+			c.c[1] = d6;
 		}
 		return this;
 	}
@@ -2246,6 +2425,36 @@ public:
 		return this;
 	}
 
+	inline Complex64 *ln(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			double d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+			double d2 = ::atan2(c.c[1], c.c[0]);
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex64 *log(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			double d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+			double d2 = ::atan2(c.c[1], c.c[0]);
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex64 *log10(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			double d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / (2 * AML_LN10);
+			double d2 = ::atan2(c.c[1], c.c[0]) / AML_LN10;
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
 
 	inline double imaginary() {
 		return c.c[1];
@@ -2256,7 +2465,7 @@ public:
 	}
 
 	inline double angle() {
-		return ::atan(c.c[1] / c.c[0]);
+		return ::atan2(c.c[1], c.c[0]);
 	}
 
 	inline double length() {
@@ -2276,11 +2485,6 @@ public:
 
 };
 
-inline Complex64 operator+(const double &lhs, const Complex64 &rhs) {
-	Complex64 ret(lhs + rhs.c.c[0], 0.0 + rhs.c.c[1]);
-	return ret;
-}
-
 inline std::string operator<<(std::string &lhs, const Complex64 &rhs) {
 	std::ostringstream string;
 	string << lhs << rhs.c.c[0] << " + " << rhs.c.c[1] << "i";
@@ -2292,8 +2496,6 @@ inline std::string operator<<(const char *lhs, const Complex64 &rhs) {
 	string << lhs << rhs.c.c[0] << " + " << rhs.c.c[1] << "i";
 	return string.str();
 }
-//basic_ostream<char, std::char_traits<char>>
-
 
 template<class charT, class traits>
 std::basic_ostream<charT, traits> &
@@ -2306,10 +2508,56 @@ operator<<(std::basic_ostream<charT, traits> &o, const Complex64 &x) {
 	return o << s.str();
 }
 
+inline Complex64 operator+(const double &lhs, const Complex64 &rhs) {
+	Complex64 ret(lhs + rhs.c.c[0], 0.0 + rhs.c.c[1]);
+	return ret;
+}
+
 inline Complex64 operator-(const double &lhs, const Complex64 &rhs) {
 	Complex64 ret(lhs - rhs.c.c[0], 0.0 - rhs.c.c[1]);
 	return ret;
 }
+
+inline Complex64 operator*(const double &lhs, const Complex64 &rhs) {
+	Complex64 ret(lhs * rhs.c.c[0], lhs * rhs.c.c[1]);
+	return ret;
+}
+
+inline Complex64 operator/(const double &lhs, const Complex64 &rhs) {
+	Complex64 ret;
+	ret.c.c[0] = (lhs * rhs.c.c[0]) / (rhs.c.c[0] * rhs.c.c[0] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.c.c[1] = (-lhs * rhs.c.c[1]) / (rhs.c.c[0] * rhs.c.c[0] + rhs.c.c[1] * rhs.c.c[1]);
+	return ret;
+}
+
+#if defined(AML_USE_STD_COMPLEX)
+
+inline Complex64 operator+(const std::complex<double> &lhs, const Complex64 &rhs) {
+	Complex64 ret = lhs;
+	return ret + rhs;
+}
+
+inline Complex64 operator-(const std::complex<double> &lhs, const Complex64 &rhs) {
+	Complex64 ret = lhs;
+	return ret - rhs;
+}
+
+inline Complex64 operator*(const std::complex<double> &lhs, const Complex64 &rhs) {
+	Complex64 ret = lhs;
+	return ret * rhs;
+}
+
+inline Complex64 operator/(const std::complex<double> &lhs, const Complex64 &rhs) {
+	Complex64 ret = lhs;
+	return ret / rhs;
+}
+
+class STD_COMPLEX64_CAST : public std::complex<double> {
+public:
+	inline STD_COMPLEX64_CAST(const Complex64 &other) : std::complex<double>(other.c.c[0], other.c.c[1]) {}
+};
+
+#endif
 
 constexpr Complex64 operator ""_i(long double d) {
 	return Complex64(0.0f, (double) d);
@@ -2321,18 +2569,27 @@ constexpr Complex64 operator ""_i(unsigned long long d) {
 
 #if defined(AML_USE_STD_COMPLEX)
 
-std::complex<double> toStdComplex(Complex64 a) {
+inline std::complex<double> toStdComplex(Complex64 a) {
 	std::complex<double> ret(a.c.c[0], a.c.c[1]);
 	return ret;
 }
 
 #endif
 
-
 class Array2Complex64 {
 public:
 	doublevec2 r{};
 	doublevec2 c{};
+
+	inline Array2Complex64() {}
+
+	inline Array2Complex64(Complex64 value) {
+		r.c[0] = value.c.c[0];
+		c.c[0] = value.c.c[1];
+		r.c[1] = value.c.c[0];
+		c.c[1] = value.c.c[1];
+	}
+
 
 	inline VectorDouble2D real() {
 		return VectorDouble2D(r.c);
@@ -2367,7 +2624,22 @@ public:
 		return this;
 	}
 
-	inline Array2Complex64 operator+(Array2Complex64 a) {
+	inline void operator+=(Array2Complex64 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+	}
+
+	inline void operator+=(Complex64 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+	}
+
+
+	inline Array2Complex64 operator+(Array2Complex64 a) const {
 		Array2Complex64 ret;
 		ret.c.c[0] = c.c[0] + a.c.c[0];
 		ret.c.c[1] = c.c[1] + a.c.c[1];
@@ -2376,7 +2648,7 @@ public:
 		return ret;
 	}
 
-	inline Array2Complex64 operator+(Complex64 a) {
+	inline Array2Complex64 operator+(Complex64 a) const {
 		Array2Complex64 ret;
 		ret.c.c[0] = c.c[0] + a.c.c[1];
 		ret.c.c[1] = c.c[1] + a.c.c[1];
@@ -2409,7 +2681,81 @@ public:
 		return this;
 	}
 
-	inline Array2Complex64 operator*(const Array2Complex64 &a) {
+
+	inline Array2Complex64 *subtract(Array2Complex64 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		return this;
+	}
+
+	inline Array2Complex64 *subtract(Complex64 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		return this;
+	}
+
+	inline void operator-=(Array2Complex64 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+	}
+
+	inline void operator-=(Complex64 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+	}
+
+	inline Array2Complex64 operator-(Array2Complex64 a) const {
+		Array2Complex64 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[0];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.r.c[0] = r.c[0] - a.r.c[0];
+		ret.r.c[1] = r.c[1] - a.r.c[1];
+		return ret;
+	}
+
+	inline Array2Complex64 operator-(Complex64 a) const {
+		Array2Complex64 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[1];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.r.c[0] = r.c[0] - a.c.c[0];
+		ret.r.c[1] = r.c[1] - a.c.c[0];
+		return ret;
+	}
+
+	inline Array2Complex64 *subtract(Array2Complex64 a, VectorU8_2D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[0];
+			r.c[0] -= a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.r.c[1];
+		}
+		return this;
+	}
+
+	inline Array2Complex64 *subtract(Complex64 a, VectorU8_2D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[1];
+			r.c[0] -= a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.c.c[0];
+		}
+		return this;
+	}
+
+
+	inline Array2Complex64 operator*(const Array2Complex64 &a) const {
 		Array2Complex64 ret;
 		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
 		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
@@ -2435,7 +2781,7 @@ public:
 		return this;
 	}
 
-	inline Array2Complex64 operator*(const Complex64 &a) {
+	inline Array2Complex64 operator*(const Complex64 &a) const {
 		Array2Complex64 ret;
 		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
 		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
@@ -2445,6 +2791,30 @@ public:
 		return ret;
 	}
 
+	inline void operator*=(const Array2Complex64 &a) {
+		double d1;
+		double d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+	}
+
+	inline void operator*=(const Complex64 &a) {
+		double d1;
+		double d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+	}
 
 	inline Array2Complex64 *multiply(const Complex64 &a) {
 		double d1;
@@ -2530,6 +2900,257 @@ public:
 		return this;
 	}
 
+	inline Array2Complex64 *divide(const Complex64 a) {
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 *divide(const Complex64 a, const VectorU8_2D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex64 *divide(const Array2Complex64 &a) {
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 *divide(const Array2Complex64 &a, const VectorU8_2D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex64 operator/(const Complex64 &a) const {
+		Array2Complex64 ret;
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		return ret;
+	}
+
+	inline Array2Complex64 operator/(const Array2Complex64 &a) const {
+		Array2Complex64 ret;
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		return ret;
+	}
+
+	inline void operator/=(const Complex64 &a) {
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+	}
+
+	inline void operator/=(const Array2Complex64 &a) {
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+	}
+
+	inline Array2Complex64 *sqrt() {
+		double d1;
+		double d2;
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[0]);
+		} else LIKELY {
+			d1 = c.c[0] / (2 * d2);
+		}
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[1]);
+		} else LIKELY {
+			d1 = c.c[1] / (2 * d2);
+		}
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 *sqrt(const VectorU8_2D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[0]);
+			} else LIKELY {
+				d1 = c.c[0] / (2 * d2);
+			}
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[1]);
+			} else LIKELY {
+				d1 = c.c[1] / (2 * d2);
+			}
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex64 *sin() {
+		double d1;
+		double d2;
+		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 *cos() {
+		double d1;
+		double d2;
+		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 *tan() {
+		double d1;
+		double d2;
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex64 *sin(const VectorU8_2D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex64 *cos(const VectorU8_2D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex64 *tan(const VectorU8_2D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
 
 	inline Array2Complex64 *exp() {
 		double d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
@@ -2851,11 +3472,79 @@ public:
 	}
 };
 
+inline std::string operator<<(std::string &lhs, const Array2Complex64 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	return string.str();
+}
+
+inline std::string operator<<(const char *lhs, const Array2Complex64 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	return string.str();
+}
+
+template<class charT, class traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &o, const Array2Complex64 &rhs) {
+	std::basic_ostringstream<charT, traits> s;
+	s.flags(o.flags());
+	s.imbue(o.getloc());
+	s.precision(o.precision());
+	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	return o << s.str();
+}
+
+inline Array2Complex64 operator+(const Complex64 &lhs, const Array2Complex64 &rhs) {
+	return rhs + lhs;
+}
+
+inline Array2Complex64 operator-(const Complex64 &lhs, const Array2Complex64 &rhs) {
+	Array2Complex64 ret;
+	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
+	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
+	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
+	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
+	return ret;
+}
+
+inline Array2Complex64 operator*(const Complex64 &lhs, const Array2Complex64 &rhs) {
+	return rhs * lhs;
+}
+
+inline Array2Complex64 operator/(const Complex64 &lhs, const Array2Complex64 &rhs) {
+	Array2Complex64 ret;
+	double d1 =
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	double d2 =
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	ret.r.c[0] = d1;
+	ret.c.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.r.c[1] = d1;
+	ret.c.c[1] = d2;
+	return ret;
+}
 
 class Array4Complex64 {
 public:
 	doublevec4 r{};
 	doublevec4 c{};
+
+	inline Array4Complex64() {}
+
+	inline Array4Complex64(Complex64 value) {
+		r.c[0] = value.c.c[0];
+		c.c[0] = value.c.c[1];
+		r.c[1] = value.c.c[0];
+		c.c[1] = value.c.c[1];
+		r.c[2] = value.c.c[0];
+		c.c[2] = value.c.c[1];
+		r.c[3] = value.c.c[0];
+		c.c[3] = value.c.c[1];
+	}
+
 
 	inline VectorDouble4D real() {
 		return VectorDouble4D(r.c);
@@ -2898,7 +3587,30 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 operator+(Array4Complex64 a) {
+	inline void operator+=(Array4Complex64 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[2];
+		c.c[3] += a.c.c[3];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+		r.c[2] += a.r.c[2];
+		r.c[3] += a.r.c[3];
+	}
+
+	inline void operator+=(Complex64 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[1];
+		c.c[3] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+		r.c[2] += a.c.c[0];
+		r.c[3] += a.c.c[0];
+	}
+
+
+	inline Array4Complex64 operator+(Array4Complex64 a) const {
 		Array4Complex64 ret{};
 		ret.c.c[0] = c.c[0] + a.c.c[0];
 		ret.c.c[1] = c.c[1] + a.c.c[1];
@@ -2911,7 +3623,7 @@ public:
 		return ret;
 	}
 
-	inline Array4Complex64 operator+(Complex64 a) {
+	inline Array4Complex64 operator+(Complex64 a) const {
 		Array4Complex64 ret{};
 		ret.c.c[0] = c.c[0] + a.c.c[1];
 		ret.c.c[1] = c.c[1] + a.c.c[1];
@@ -2964,7 +3676,121 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 operator*(const Array4Complex64 &a) {
+
+	inline Array4Complex64 *subtract(Array4Complex64 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[2];
+		c.c[3] -= a.c.c[3];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		r.c[2] -= a.r.c[2];
+		r.c[3] -= a.r.c[3];
+		return this;
+	}
+
+	inline Array4Complex64 *subtract(Complex64 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[1];
+		c.c[3] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		r.c[2] -= a.c.c[0];
+		r.c[3] -= a.c.c[0];
+		return this;
+	}
+
+	inline void operator-=(Array4Complex64 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[2];
+		c.c[3] -= a.c.c[3];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		r.c[2] -= a.r.c[2];
+		r.c[3] -= a.r.c[3];
+	}
+
+	inline void operator-=(Complex64 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[1];
+		c.c[3] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		r.c[2] -= a.c.c[0];
+		r.c[3] -= a.c.c[0];
+	}
+
+	inline Array4Complex64 operator-(Array4Complex64 a) const {
+		Array4Complex64 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[0];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.c.c[2] = c.c[2] - a.c.c[2];
+		ret.c.c[3] = c.c[3] - a.c.c[3];
+		ret.r.c[0] = r.c[0] - a.r.c[0];
+		ret.r.c[1] = r.c[1] - a.r.c[1];
+		ret.r.c[2] = r.c[2] - a.r.c[2];
+		ret.r.c[3] = r.c[3] - a.r.c[3];
+		return ret;
+	}
+
+	inline Array4Complex64 operator-(Complex64 a) const {
+		Array4Complex64 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[1];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.c.c[2] = c.c[2] - a.c.c[1];
+		ret.c.c[3] = c.c[3] - a.c.c[1];
+		ret.r.c[0] = r.c[0] - a.c.c[0];
+		ret.r.c[1] = r.c[1] - a.c.c[0];
+		ret.r.c[2] = r.c[2] - a.c.c[0];
+		ret.r.c[3] = r.c[3] - a.c.c[0];
+		return ret;
+	}
+
+	inline Array4Complex64 *subtract(Array4Complex64 a, VectorU8_4D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[0];
+			r.c[0] -= a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.r.c[1];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] -= a.c.c[2];
+			r.c[2] -= a.r.c[2];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] -= a.c.c[3];
+			r.c[3] -= a.r.c[3];
+		}
+		return this;
+	}
+
+	inline Array4Complex64 *subtract(Complex64 a, VectorU8_4D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[1];
+			r.c[0] -= a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.c.c[0];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] -= a.c.c[1];
+			r.c[2] -= a.c.c[0];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] -= a.c.c[1];
+			r.c[3] -= a.c.c[0];
+		}
+		return this;
+	}
+
+
+	inline Array4Complex64 operator*(const Array4Complex64 &a) const {
 		Array4Complex64 ret;
 		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
 		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
@@ -3002,7 +3828,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 operator*(const Complex64 &a) {
+	inline Array4Complex64 operator*(const Complex64 &a) const {
 		Array4Complex64 ret;
 		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
 		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
@@ -3017,6 +3843,48 @@ public:
 		return ret;
 	}
 
+	inline void operator*=(const Array4Complex64 &a) {
+		double d1;
+		double d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+	}
+
+	inline void operator*=(const Complex64 &a) {
+		double d1;
+		double d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		r.c[3] = d1;
+		c.c[3] = d2;
+	}
 
 	inline Array4Complex64 *multiply(const Complex64 &a) {
 		double d1;
@@ -3153,6 +4021,425 @@ public:
 		}
 		return this;
 	}
+
+	inline Array4Complex64 *divide(const Complex64 a) {
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex64 *divide(const Complex64 a, const VectorU8_4D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex64 *divide(const Array4Complex64 &a) {
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex64 *divide(const Array4Complex64 &a, const VectorU8_4D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex64 operator/(const Complex64 &a) const {
+		Array4Complex64 ret;
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[2] = d1;
+		ret.c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[3] = d1;
+		ret.c.c[3] = d2;
+		return ret;
+	}
+
+	inline Array4Complex64 operator/(const Array4Complex64 &a) const {
+		Array4Complex64 ret;
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		ret.r.c[2] = d1;
+		ret.c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		ret.r.c[3] = d1;
+		ret.c.c[3] = d2;
+		return ret;
+	}
+
+	inline void operator/=(const Complex64 &a) {
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+	}
+
+	inline void operator/=(const Array4Complex64 &a) {
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+	}
+
+	inline Array4Complex64 *sqrt() {
+		double d1;
+		double d2;
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[0]);
+		} else LIKELY {
+			d1 = c.c[0] / (2 * d2);
+		}
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[1]);
+		} else LIKELY {
+			d1 = c.c[1] / (2 * d2);
+		}
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[2]);
+		} else LIKELY {
+			d1 = c.c[2] / (2 * d2);
+		}
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[3]);
+		} else LIKELY {
+			d1 = c.c[3] / (2 * d2);
+		}
+		return this;
+	}
+
+	inline Array4Complex64 *sqrt(const VectorU8_4D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[0]);
+			} else LIKELY {
+				d1 = c.c[0] / (2 * d2);
+			}
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[1]);
+			} else LIKELY {
+				d1 = c.c[1] / (2 * d2);
+			}
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[2]);
+			} else LIKELY {
+				d1 = c.c[2] / (2 * d2);
+			}
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[3]);
+			} else LIKELY {
+				d1 = c.c[3] / (2 * d2);
+			}
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex64 *sin() {
+		double d1;
+		double d2;
+		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
+		d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
+		d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex64 *cos() {
+		double d1;
+		double d2;
+		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
+		d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
+		d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex64 *tan() {
+		double d1;
+		double d2;
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex64 *sin(const VectorU8_4D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
+			d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
+			d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex64 *cos(const VectorU8_4D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
+			d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
+			d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex64 *tan(const VectorU8_4D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
 
 	inline Array4Complex64 *exp() {
 		double d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
@@ -3674,11 +4961,101 @@ public:
 	}
 };
 
+inline std::string operator<<(std::string &lhs, const Array4Complex64 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	return string.str();
+}
+
+inline std::string operator<<(const char *lhs, const Array4Complex64 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	return string.str();
+}
+
+template<class charT, class traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &o, const Array4Complex64 &rhs) {
+	std::basic_ostringstream<charT, traits> s;
+	s.flags(o.flags());
+	s.imbue(o.getloc());
+	s.precision(o.precision());
+	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+	  << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	return o << s.str();
+}
+
+inline Array4Complex64 operator+(const Complex64 &lhs, const Array4Complex64 &rhs) {
+	return rhs + lhs;
+}
+
+inline Array4Complex64 operator-(const Complex64 &lhs, const Array4Complex64 &rhs) {
+	Array4Complex64 ret;
+	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
+	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
+	ret.c.c[2] = lhs.c.c[1] - rhs.c.c[2];
+	ret.c.c[3] = lhs.c.c[1] - rhs.c.c[3];
+	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
+	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
+	ret.r.c[2] = lhs.c.c[0] - rhs.r.c[2];
+	ret.r.c[3] = lhs.c.c[0] - rhs.r.c[3];
+	return ret;
+}
+
+inline Array4Complex64 operator*(const Complex64 &lhs, const Array4Complex64 &rhs) {
+	return rhs * lhs;
+}
+
+inline Array4Complex64 operator/(const Complex64 &lhs, const Array4Complex64 &rhs) {
+	Array4Complex64 ret;
+	double d1 =
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	double d2 =
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	ret.r.c[0] = d1;
+	ret.c.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.r.c[1] = d1;
+	ret.c.c[1] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	ret.r.c[2] = d1;
+	ret.c.c[2] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	ret.r.c[3] = d1;
+	ret.c.c[3] = d2;
+	return ret;
+}
 
 class Array8Complex64 {
 public:
 	doublevec8 r{};
 	doublevec8 c{};
+
+	inline Array8Complex64() {}
+
+	inline Array8Complex64(Complex64 value) {
+		r.c[0] = value.c.c[0];
+		c.c[0] = value.c.c[1];
+		r.c[1] = value.c.c[0];
+		c.c[1] = value.c.c[1];
+		r.c[2] = value.c.c[0];
+		c.c[2] = value.c.c[1];
+		r.c[3] = value.c.c[0];
+		c.c[3] = value.c.c[1];
+		r.c[4] = value.c.c[0];
+		c.c[4] = value.c.c[1];
+		r.c[5] = value.c.c[0];
+		c.c[5] = value.c.c[1];
+		r.c[6] = value.c.c[0];
+		c.c[6] = value.c.c[1];
+		r.c[7] = value.c.c[0];
+		c.c[7] = value.c.c[1];
+	}
 
 	inline VectorDouble8D real() {
 		return VectorDouble8D(r.c);
@@ -3737,7 +5114,46 @@ public:
 		return this;
 	}
 
-	inline Array8Complex64 operator+(Array8Complex64 a) {
+
+	inline void operator+=(Array8Complex64 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[2];
+		c.c[3] += a.c.c[3];
+		c.c[4] += a.c.c[4];
+		c.c[5] += a.c.c[5];
+		c.c[6] += a.c.c[6];
+		c.c[7] += a.c.c[7];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+		r.c[2] += a.r.c[2];
+		r.c[3] += a.r.c[3];
+		r.c[4] += a.r.c[4];
+		r.c[5] += a.r.c[5];
+		r.c[6] += a.r.c[6];
+		r.c[7] += a.r.c[7];
+	}
+
+	inline void operator+=(Complex64 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[1];
+		c.c[3] += a.c.c[1];
+		c.c[4] += a.c.c[1];
+		c.c[5] += a.c.c[1];
+		c.c[6] += a.c.c[1];
+		c.c[7] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+		r.c[2] += a.c.c[0];
+		r.c[3] += a.c.c[0];
+		r.c[4] += a.c.c[0];
+		r.c[5] += a.c.c[0];
+		r.c[6] += a.c.c[0];
+		r.c[7] += a.c.c[0];
+	}
+
+	inline Array8Complex64 operator+(Array8Complex64 a) const {
 		Array8Complex64 ret;
 		ret.c.c[0] = c.c[0] + a.c.c[0];
 		ret.c.c[1] = c.c[1] + a.c.c[1];
@@ -3758,7 +5174,7 @@ public:
 		return ret;
 	}
 
-	inline Array8Complex64 operator+(Complex64 a) {
+	inline Array8Complex64 operator+(Complex64 a) const {
 		Array8Complex64 ret;
 		ret.c.c[0] = c.c[0] + a.c.c[1];
 		ret.c.c[1] = c.c[1] + a.c.c[1];
@@ -3851,8 +5267,200 @@ public:
 		return this;
 	}
 
+	inline Array8Complex64 *subtract(Array8Complex64 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[2];
+		c.c[3] -= a.c.c[3];
+		c.c[4] -= a.c.c[4];
+		c.c[5] -= a.c.c[5];
+		c.c[6] -= a.c.c[6];
+		c.c[7] -= a.c.c[7];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		r.c[2] -= a.r.c[2];
+		r.c[3] -= a.r.c[3];
+		r.c[4] -= a.r.c[4];
+		r.c[5] -= a.r.c[5];
+		r.c[6] -= a.r.c[6];
+		r.c[7] -= a.r.c[7];
+		return this;
+	}
 
-	inline Array8Complex64 operator*(const Array8Complex64 &a) {
+	inline Array8Complex64 *subtract(Complex64 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[1];
+		c.c[3] -= a.c.c[1];
+		c.c[4] -= a.c.c[1];
+		c.c[5] -= a.c.c[1];
+		c.c[6] -= a.c.c[1];
+		c.c[7] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		r.c[2] -= a.c.c[0];
+		r.c[3] -= a.c.c[0];
+		r.c[4] -= a.c.c[0];
+		r.c[5] -= a.c.c[0];
+		r.c[6] -= a.c.c[0];
+		r.c[7] -= a.c.c[0];
+		return this;
+	}
+
+	inline void operator-=(Array8Complex64 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[2];
+		c.c[3] -= a.c.c[3];
+		c.c[4] -= a.c.c[4];
+		c.c[5] -= a.c.c[5];
+		c.c[6] -= a.c.c[6];
+		c.c[7] -= a.c.c[7];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		r.c[2] -= a.r.c[2];
+		r.c[3] -= a.r.c[3];
+		r.c[4] -= a.r.c[4];
+		r.c[5] -= a.r.c[5];
+		r.c[6] -= a.r.c[6];
+		r.c[7] -= a.r.c[7];
+	}
+
+	inline void operator-=(Complex64 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[1];
+		c.c[3] -= a.c.c[1];
+		c.c[4] -= a.c.c[1];
+		c.c[5] -= a.c.c[1];
+		c.c[6] -= a.c.c[1];
+		c.c[7] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		r.c[2] -= a.c.c[0];
+		r.c[3] -= a.c.c[0];
+		r.c[4] -= a.c.c[0];
+		r.c[5] -= a.c.c[0];
+		r.c[6] -= a.c.c[0];
+		r.c[7] -= a.c.c[0];
+	}
+
+	inline Array8Complex64 operator-(Array8Complex64 a) const {
+		Array8Complex64 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[0];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.c.c[2] = c.c[2] - a.c.c[2];
+		ret.c.c[3] = c.c[3] - a.c.c[3];
+		ret.c.c[4] = c.c[4] - a.c.c[4];
+		ret.c.c[5] = c.c[5] - a.c.c[5];
+		ret.c.c[6] = c.c[6] - a.c.c[6];
+		ret.c.c[7] = c.c[7] - a.c.c[7];
+		ret.r.c[0] = r.c[0] - a.r.c[0];
+		ret.r.c[1] = r.c[1] - a.r.c[1];
+		ret.r.c[2] = r.c[2] - a.r.c[2];
+		ret.r.c[3] = r.c[3] - a.r.c[3];
+		ret.r.c[4] = r.c[4] - a.r.c[4];
+		ret.r.c[5] = r.c[5] - a.r.c[5];
+		ret.r.c[6] = r.c[6] - a.r.c[6];
+		ret.r.c[7] = r.c[7] - a.r.c[7];
+		return ret;
+	}
+
+	inline Array8Complex64 operator-(Complex64 a) const {
+		Array8Complex64 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[1];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.c.c[2] = c.c[2] - a.c.c[1];
+		ret.c.c[3] = c.c[3] - a.c.c[1];
+		ret.c.c[4] = c.c[4] - a.c.c[1];
+		ret.c.c[5] = c.c[5] - a.c.c[1];
+		ret.c.c[6] = c.c[6] - a.c.c[1];
+		ret.c.c[7] = c.c[7] - a.c.c[1];
+		ret.r.c[0] = r.c[0] - a.c.c[0];
+		ret.r.c[1] = r.c[1] - a.c.c[0];
+		ret.r.c[2] = r.c[2] - a.c.c[0];
+		ret.r.c[3] = r.c[3] - a.c.c[0];
+		ret.r.c[4] = r.c[4] - a.c.c[0];
+		ret.r.c[5] = r.c[5] - a.c.c[0];
+		ret.r.c[6] = r.c[6] - a.c.c[0];
+		ret.r.c[7] = r.c[7] - a.c.c[0];
+		return ret;
+	}
+
+	inline Array8Complex64 *subtract(Array8Complex64 a, VectorU8_8D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[0];
+			r.c[0] -= a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.r.c[1];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] -= a.c.c[2];
+			r.c[2] -= a.r.c[2];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] -= a.c.c[3];
+			r.c[3] -= a.r.c[3];
+		}
+		if (mask.v.c[4]) {
+			c.c[4] -= a.c.c[4];
+			r.c[4] -= a.r.c[4];
+		}
+		if (mask.v.c[5]) {
+			c.c[5] -= a.c.c[5];
+			r.c[5] -= a.r.c[5];
+		}
+		if (mask.v.c[6]) {
+			c.c[6] -= a.c.c[6];
+			r.c[6] -= a.r.c[6];
+		}
+		if (mask.v.c[7]) {
+			c.c[7] -= a.c.c[7];
+			r.c[7] -= a.r.c[7];
+		}
+		return this;
+	}
+
+	inline Array8Complex64 *subtract(Complex64 a, VectorU8_8D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[1];
+			r.c[0] -= a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.c.c[0];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] -= a.c.c[1];
+			r.c[2] -= a.c.c[0];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] -= a.c.c[1];
+			r.c[3] -= a.c.c[0];
+		}
+		if (mask.v.c[4]) {
+			c.c[4] -= a.c.c[1];
+			r.c[4] -= a.c.c[0];
+		}
+		if (mask.v.c[5]) {
+			c.c[5] -= a.c.c[1];
+			r.c[5] -= a.c.c[0];
+		}
+		if (mask.v.c[6]) {
+			c.c[6] -= a.c.c[1];
+			r.c[6] -= a.c.c[0];
+		}
+		if (mask.v.c[7]) {
+			c.c[7] -= a.c.c[1];
+			r.c[7] -= a.c.c[0];
+		}
+		return this;
+	}
+
+
+	inline Array8Complex64 operator*(const Array8Complex64 &a) const {
 		Array8Complex64 ret;
 		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
 		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
@@ -3914,7 +5522,82 @@ public:
 		return this;
 	}
 
-	inline Array8Complex64 operator*(const Complex64 &a) {
+	inline void operator*=(const Array8Complex64 &a) {
+		double d1;
+		double d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
+		d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
+		d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
+		d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
+		d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		r.c[7] = d1;
+		c.c[7] = d2;
+	}
+
+	inline void operator*=(const Complex64 &a) {
+		double d1;
+		double d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
+		d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
+		d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
+		d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
+		d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		r.c[7] = d1;
+		c.c[7] = d2;
+	}
+
+	inline Array8Complex64 operator*(const Complex64 &a) const {
 		Array8Complex64 ret;
 		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
 		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
@@ -3936,7 +5619,6 @@ public:
 
 		return ret;
 	}
-
 
 	inline Array8Complex64 *multiply(const Complex64 &a) {
 		double d1;
@@ -4173,6 +5855,762 @@ public:
 		if (mask.v.c[7]) {
 			d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
 			d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex64 *divide(const Complex64 a) {
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex64 *divide(const Complex64 a, const VectorU8_8D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex64 *divide(const Array8Complex64 &a) {
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex64 *divide(const Array8Complex64 &a, const VectorU8_8D &mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+			d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+			d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+			d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+			d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex64 operator/(const Complex64 &a) const {
+		Array8Complex64 ret;
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[2] = d1;
+		ret.c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[3] = d1;
+		ret.c.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[4] = d1;
+		ret.c.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[5] = d1;
+		ret.c.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[6] = d1;
+		ret.c.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[7] = d1;
+		ret.c.c[7] = d2;
+		return ret;
+	}
+
+	inline Array8Complex64 operator/(const Array8Complex64 &a) const {
+		Array8Complex64 ret;
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		ret.r.c[2] = d1;
+		ret.c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		ret.r.c[3] = d1;
+		ret.c.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		ret.r.c[4] = d1;
+		ret.c.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		ret.r.c[5] = d1;
+		ret.c.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		ret.r.c[6] = d1;
+		ret.c.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		ret.r.c[7] = d1;
+		ret.c.c[7] = d2;
+		return ret;
+	}
+
+	inline void operator/=(const Complex64 &a) {
+		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+	}
+
+	inline void operator/=(const Array8Complex64 &a) {
+		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+	}
+
+	inline Array8Complex64 *sqrt() {
+		double d1;
+		double d2;
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[0]);
+		} else LIKELY {
+			d1 = c.c[0] / (2 * d2);
+		}
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[1]);
+		} else LIKELY {
+			d1 = c.c[1] / (2 * d2);
+		}
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[2]);
+		} else LIKELY {
+			d1 = c.c[2] / (2 * d2);
+		}
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[3]);
+		} else LIKELY {
+			d1 = c.c[3] / (2 * d2);
+		}
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[4]);
+		} else LIKELY {
+			d1 = c.c[4] / (2 * d2);
+		}
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[5]);
+		} else LIKELY {
+			d1 = c.c[5] / (2 * d2);
+		}
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[6]);
+		} else LIKELY {
+			d1 = c.c[6] / (2 * d2);
+		}
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[7]);
+		} else LIKELY {
+			d1 = c.c[7] / (2 * d2);
+		}
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex64 *sqrt(const VectorU8_8D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[0]);
+			} else LIKELY {
+				d1 = c.c[0] / (2 * d2);
+			}
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[1]);
+			} else LIKELY {
+				d1 = c.c[1] / (2 * d2);
+			}
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[2]);
+			} else LIKELY {
+				d1 = c.c[2] / (2 * d2);
+			}
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[3]);
+			} else LIKELY {
+				d1 = c.c[3] / (2 * d2);
+			}
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[4]);
+			} else LIKELY {
+				d1 = c.c[4] / (2 * d2);
+			}
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[5]);
+			} else LIKELY {
+				d1 = c.c[5] / (2 * d2);
+			}
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[6]);
+			} else LIKELY {
+				d1 = c.c[6] / (2 * d2);
+			}
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[7]);
+			} else LIKELY {
+				d1 = c.c[7] / (2 * d2);
+			}
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex64 *sin() {
+		double d1;
+		double d2;
+		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
+		d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
+		d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::sin(r.c[4]) * ::cosh(c.c[4]);
+		d2 = ::cos(c.c[4]) * ::sinh(r.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::sin(r.c[5]) * ::cosh(c.c[5]);
+		d2 = ::cos(c.c[5]) * ::sinh(r.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::sin(r.c[6]) * ::cosh(c.c[6]);
+		d2 = ::cos(c.c[6]) * ::sinh(r.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::sin(r.c[7]) * ::cosh(c.c[7]);
+		d2 = ::cos(c.c[7]) * ::sinh(r.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex64 *cos() {
+		double d1;
+		double d2;
+		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
+		d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
+		d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::cos(r.c[4]) * ::cosh(c.c[4]);
+		d2 = -::sin(c.c[4]) * ::sinh(r.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::cos(r.c[5]) * ::cosh(c.c[5]);
+		d2 = -::sin(c.c[5]) * ::sinh(r.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::cos(r.c[6]) * ::cosh(c.c[6]);
+		d2 = -::sin(c.c[6]) * ::sinh(r.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::cos(r.c[7]) * ::cosh(c.c[7]);
+		d2 = -::sin(c.c[7]) * ::sinh(r.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex64 *tan() {
+		double d1;
+		double d2;
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+		d2 = ::sinh(c.c[4] + c.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+		d2 = ::sinh(c.c[5] + c.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+		d2 = ::sinh(c.c[6] + c.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+		d2 = ::sinh(c.c[7] + c.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex64 *sin(const VectorU8_8D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
+			d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
+			d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::sin(r.c[4]) * ::cosh(c.c[4]);
+			d2 = ::cos(c.c[4]) * ::sinh(r.c[4]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::sin(r.c[5]) * ::cosh(c.c[5]);
+			d2 = ::cos(c.c[5]) * ::sinh(r.c[5]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::sin(r.c[6]) * ::cosh(c.c[6]);
+			d2 = ::cos(c.c[6]) * ::sinh(r.c[6]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::sin(r.c[7]) * ::cosh(c.c[7]);
+			d2 = ::cos(c.c[7]) * ::sinh(r.c[7]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex64 *cos(const VectorU8_8D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
+			d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
+			d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::cos(r.c[4]) * ::cosh(c.c[4]);
+			d2 = -::sin(c.c[4]) * ::sinh(r.c[4]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::cos(r.c[5]) * ::cosh(c.c[5]);
+			d2 = -::sin(c.c[5]) * ::sinh(r.c[5]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::cos(r.c[6]) * ::cosh(c.c[6]);
+			d2 = -::sin(c.c[6]) * ::sinh(r.c[6]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::cos(r.c[7]) * ::cosh(c.c[7]);
+			d2 = -::sin(c.c[7]) * ::sinh(r.c[7]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex64 *tan(const VectorU8_8D mask) {
+		double d1;
+		double d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+			d2 = ::sinh(c.c[4] + c.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+			d2 = ::sinh(c.c[5] + c.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+			d2 = ::sinh(c.c[6] + c.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+			d2 = ::sinh(c.c[7] + c.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
 			r.c[7] = d1;
 			c.c[7] = d2;
 		}
@@ -5100,5 +7538,5758 @@ public:
 	}
 
 };
+
+inline std::string operator<<(std::string &lhs, const Array8Complex64 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
+		   << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
+		   << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	return string.str();
+}
+
+inline std::string operator<<(const char *lhs, const Array8Complex64 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
+		   << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
+		   << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	return string.str();
+}
+
+template<class charT, class traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &o, const Array8Complex64 &rhs) {
+	std::basic_ostringstream<charT, traits> s;
+	s.flags(o.flags());
+	s.imbue(o.getloc());
+	s.precision(o.precision());
+	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+	  << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
+	  << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
+	  << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	return o << s.str();
+}
+
+inline Array8Complex64 operator+(const Complex64 &lhs, const Array8Complex64 &rhs) {
+	return rhs + lhs;
+}
+
+inline Array8Complex64 operator-(const Complex64 &lhs, const Array8Complex64 &rhs) {
+	Array8Complex64 ret;
+	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
+	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
+	ret.c.c[2] = lhs.c.c[1] - rhs.c.c[2];
+	ret.c.c[3] = lhs.c.c[1] - rhs.c.c[3];
+	ret.c.c[4] = lhs.c.c[1] - rhs.c.c[4];
+	ret.c.c[5] = lhs.c.c[1] - rhs.c.c[5];
+	ret.c.c[6] = lhs.c.c[1] - rhs.c.c[6];
+	ret.c.c[7] = lhs.c.c[1] - rhs.c.c[7];
+	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
+	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
+	ret.r.c[2] = lhs.c.c[0] - rhs.r.c[2];
+	ret.r.c[3] = lhs.c.c[0] - rhs.r.c[3];
+	ret.r.c[4] = lhs.c.c[0] - rhs.r.c[4];
+	ret.r.c[5] = lhs.c.c[0] - rhs.r.c[5];
+	ret.r.c[6] = lhs.c.c[0] - rhs.r.c[6];
+	ret.r.c[7] = lhs.c.c[0] - rhs.r.c[7];
+	return ret;
+}
+
+inline Array8Complex64 operator*(const Complex64 &lhs, const Array8Complex64 &rhs) {
+	return rhs * lhs;
+}
+
+inline Array8Complex64 operator/(const Complex64 &lhs, const Array8Complex64 &rhs) {
+	Array8Complex64 ret;
+	double d1 =
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	double d2 =
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	ret.r.c[0] = d1;
+	ret.c.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.r.c[1] = d1;
+	ret.c.c[1] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	ret.r.c[2] = d1;
+	ret.c.c[2] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	ret.r.c[3] = d1;
+	ret.c.c[3] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[4] + lhs.c.c[1] * rhs.c.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.c.c[4] * rhs.c.c[4]);
+	d2 = (lhs.c.c[1] * rhs.r.c[4] - lhs.c.c[0] * rhs.c.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.c.c[4] * rhs.c.c[4]);
+	ret.r.c[4] = d1;
+	ret.c.c[4] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[5] + lhs.c.c[1] * rhs.c.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.c.c[5] * rhs.c.c[5]);
+	d2 = (lhs.c.c[1] * rhs.r.c[5] - lhs.c.c[0] * rhs.c.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.c.c[5] * rhs.c.c[5]);
+	ret.r.c[5] = d1;
+	ret.c.c[5] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[6] + lhs.c.c[1] * rhs.c.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.c.c[6] * rhs.c.c[6]);
+	d2 = (lhs.c.c[1] * rhs.r.c[6] - lhs.c.c[0] * rhs.c.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.c.c[6] * rhs.c.c[6]);
+	ret.r.c[6] = d1;
+	ret.c.c[6] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[7] + lhs.c.c[1] * rhs.c.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.c.c[7] * rhs.c.c[7]);
+	d2 = (lhs.c.c[1] * rhs.r.c[7] - lhs.c.c[0] * rhs.c.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.c.c[7] * rhs.c.c[7]);
+	ret.r.c[7] = d1;
+	ret.c.c[7] = d2;
+	return ret;
+}
+
+
+class Complex32 {
+public:
+	floatvec2 c{};
+
+
+	inline constexpr Complex32(const float real, const float img) {
+		c.c[0] = real;
+		c.c[1] = img;
+	}
+
+	inline explicit Complex32(float *values) {
+		c.c[0] = values[0];
+		c.c[1] = values[1];
+	}
+
+	inline constexpr Complex32(float real) {
+		c.c[0] = real;
+		c.c[1] = 0.0;
+	}
+
+#if defined(AML_USE_STD_COMPLEX)
+
+	inline Complex32(std::complex<float> sc) {
+		c.c[0] = sc.real();
+		c.c[1] = sc.imag();
+	}
+
+#endif
+
+	inline Complex32() {
+		c.c[0] = 0;
+		c.c[1] = 0;
+	}
+
+	inline void set([[maybe_unused]]uint64_t location, Complex32 value) {
+		c.c[0] = value.c.c[0];
+		c.c[1] = value.c.c[1];
+	}
+
+//add sub
+	inline Complex32 *add(Complex32 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		return this;
+	}
+
+	inline Complex32 *add(Complex32 a, VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			c.c[1] += a.c.c[1];
+			c.c[0] += a.c.c[0];
+		}
+		return this;
+	}
+
+	inline Complex32 operator+(Complex32 a) {
+		Complex32 ret(c.c[0] + a.c.c[0], c.c[1] + a.c.c[1]);
+		return ret;
+	}
+
+	inline Complex32 operator-(Complex32 a) {
+		Complex32 ret(c.c[0] - a.c.c[0], c.c[1] - a.c.c[1]);
+		return ret;
+	}
+
+
+	inline void operator+=(Complex32 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+	}
+
+	inline void operator-=(Complex32 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+	}
+
+	inline Complex32 *subtract(Complex32 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		return this;
+	}
+
+	inline Complex32 *subtract(Complex32 a, VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			c.c[0] -= a.c.c[0];
+			c.c[1] -= a.c.c[1];
+
+		}
+		return this;
+	}
+
+	inline Complex32 *conjugate() {
+		c.c[1] = -c.c[1];
+		return this;
+	}
+
+//mul
+	inline Complex32 *multiply(Complex32 a) {
+		float d1 = c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1];
+		float d2 = c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0];
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+
+	inline Complex32 *multiply(const Complex32 &a, const VectorU8_1D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c) LIKELY {
+			d1 = c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1];
+			d2 = c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0];
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+
+
+	}
+
+	inline Complex32 operator*(Complex32 a) {
+		Complex32 ret(c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1], c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0]);
+		return ret;
+	}
+
+	inline void operator*=(Complex32 a) {
+		float d1 = c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1];
+		float d2 = c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0];
+		c.c[0] = d1;
+		c.c[1] = d2;
+	}
+
+	inline void operator*=(float a) {
+		c.c[0] = c.c[0] * a;
+		c.c[1] = c.c[1] * a;
+	}
+
+
+	inline Complex32 *square() {
+		float d1 = c.c[0] * c.c[0] - c.c[1] * c.c[1];
+		float d2 = c.c[0] * c.c[1] + c.c[1] * c.c[0];
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *square(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			float d1 = c.c[0] * c.c[0] - c.c[1] * c.c[1];
+			float d2 = c.c[0] * c.c[1] + c.c[1] * c.c[0];
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+//division
+	inline Complex32 operator/(Complex32 a) {
+		Complex32 ret;
+		ret.c.c[0] = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.c.c[1] = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		return ret;
+	}
+
+	inline void operator/=(Complex32 a) {
+		float d1 = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		c.c[0] = d1;
+		c.c[1] = d2;
+	}
+
+	inline void operator/=(float a) {
+		float d1 = c.c[0] / a;
+		float d2 = c.c[1] / a;
+		c.c[0] = d1;
+		c.c[1] = d2;
+	}
+
+	inline Complex32 *divide(Complex32 a) {
+		float d1 = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 operator/(float a) {
+		Complex32 ret;
+		ret.c.c[0] = c.c[0] / a;
+		ret.c.c[1] = c.c[1] / a;
+		return ret;
+	}
+
+	inline Complex32 *divide(float a) {
+		float d1 = c.c[0] / a;
+		float d2 = c.c[1] / a;
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *divide(const float a, const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			float d1 = c.c[0] / a;
+			float d2 = c.c[1] / a;
+
+			c.c[0] = d1;
+			c.c[1] = d2;
+
+		}
+
+		return this;
+	}
+
+	inline Complex32 *divide(const Complex32 a, const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			float d1 = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			float d2 = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+
+			c.c[0] = d1;
+			c.c[1] = d2;
+
+		}
+
+		return this;
+	}
+
+//sqrt
+	inline Complex32 *sqrt() {
+		float d2 = ::sqrt((-c.c[0] + ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1])) / (2));
+		float d1;
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(c.c[0]);
+		} else LIKELY {
+			d1 = c.c[1] / (2 * d2);
+		}
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *sqrt(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			float d2 = ::sqrt((-c.c[0] + ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1])) / (2));
+			float d1;
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(c.c[0]);
+			} else LIKELY {
+				d1 = c.c[1] / (2 * d2);
+			}
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex32 *sin() {
+		float d1 = ::sin(c.c[0]) * ::cosh(c.c[1]);
+		float d2 = ::cos(c.c[1]) * ::sinh(c.c[0]);
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *cos() {
+		float d1 = ::cos(c.c[0]) * ::cosh(c.c[1]);
+		float d2 = -::sin(c.c[1]) * ::sinh(c.c[0]);
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *tan() {
+		float d1 = ::sin(c.c[0] + c.c[0]) / (::cos(c.c[0] + c.c[0]) * ::cosh(c.c[1] + c.c[1]));
+		float d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(c.c[0] + c.c[0]) * ::cosh(c.c[1] + c.c[1]));
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *sin(const VectorU8_1D mask) {
+		if (mask.v.c) {
+			float d1 = ::sin(c.c[0]) * ::cosh(c.c[1]);
+			float d2 = ::cos(c.c[1]) * ::sinh(c.c[0]);
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex32 *cos(const VectorU8_1D mask) {
+		if (mask.v.c) {
+			float d1 = ::cos(c.c[0]) * ::cosh(c.c[1]);
+			float d2 = -::sin(c.c[1]) * ::sinh(c.c[0]);
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex32 *tan(const VectorU8_1D mask) {
+		if (mask.v.c) {
+			float d1 = ::sin(c.c[0] + c.c[0]) / (::cos(c.c[0] + c.c[0]) * ::cosh(c.c[1] + c.c[1]));
+			float d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(c.c[0] + c.c[0]) * ::cosh(c.c[1] + c.c[1]));
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+
+	inline Complex32 *exp() {
+		float d1 = ::exp(c.c[0]) * ::cos(c.c[1]);
+		float d2 = ::exp(c.c[0]) * ::sin(c.c[1]);
+
+
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *exp(float n) {
+		float d1 = ::pow(n, c.c[0]) * ::cos(c.c[1] * ::log(n));
+		float d2 = ::pow(n, c.c[0]) * ::sin(c.c[1] * ::log(n));
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *pow(float n) {
+		float d1 = ::pow(c.c[0] * c.c[0] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], c.c[0]));
+		float d2 = ::pow(c.c[0] * c.c[0] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], c.c[0]));
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *pow(Complex32 n) {
+		float d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+		float d2 = ::atan2(c.c[1], c.c[0]);
+		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		float d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		float d5 = d3 * ::cos(d4);
+		float d6 = d3 * ::sin(d4);
+		c.c[0] = d5;
+		c.c[1] = d6;
+		return this;
+	}
+
+	inline Complex32 *pow(float n, const VectorU8_1D &mask) {
+		if (mask.v.c) LIKELY {
+			float d1 = ::pow(c.c[0] * c.c[0] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], c.c[0]));
+			float d2 = ::pow(c.c[0] * c.c[0] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], c.c[0]));
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex32 *pow(Complex32 n, const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			float d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+			float d2 = ::atan2(c.c[1], c.c[0]);
+			float d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			float d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			float d5 = d3 * ::cos(d4);
+			float d6 = d3 * ::sin(d4);
+			c.c[0] = d5;
+			c.c[1] = d6;
+		}
+		return this;
+	}
+
+	inline float abs() {
+		return ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1]);
+	}
+
+	inline bool abs_gt(float a) {
+		return a * a < c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_lt(float a) {
+		return a * a > c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_eq(float a) {
+		return a * a == c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_gt(Complex32 a) {
+		return a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1] < c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_lt(Complex32 a) {
+		return a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1] > c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+	inline bool abs_eq(Complex32 a) {
+		return a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1] == c.c[0] * c.c[0] + c.c[1] * c.c[1];
+	}
+
+
+	inline Complex32 *ln() {
+		float d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+		float d2 = ::atan2(c.c[1], c.c[0]);
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *log() {
+		float d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+		float d2 = ::atan2(c.c[1], c.c[0]);
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *log10() {
+		float d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / (2 * AML_LN10);
+		float d2 = ::atan2(c.c[1], c.c[0]) / AML_LN10;
+		c.c[0] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Complex32 *ln(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			float d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+			float d2 = ::atan2(c.c[1], c.c[0]);
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex32 *log(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			float d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / 2;
+			float d2 = ::atan2(c.c[1], c.c[0]);
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Complex32 *log10(const VectorU8_1D mask) {
+		if (mask.v.c) LIKELY {
+			float d1 = ::log(c.c[0] * c.c[0] + c.c[1] * c.c[1]) / (2 * AML_LN10);
+			float d2 = ::atan2(c.c[1], c.c[0]) / AML_LN10;
+			c.c[0] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+
+	inline float imaginary() {
+		return c.c[1];
+	}
+
+	inline float real() {
+		return c.c[0];
+	}
+
+	inline float angle() {
+		return ::atan2(c.c[1], c.c[0]);
+	}
+
+	inline float length() {
+		return ::sqrt(c.c[0] * c.c[0] + c.c[1] * c.c[1]);
+	}
+
+	inline Complex32 *polar(float length, float angle) {
+		c.c[0] = length * ::cos(angle);
+		c.c[1] = length * ::sin(angle);
+		return this;
+	}
+
+	inline Complex32 operator[]([[maybe_unused]]uint64_t location) {
+		return *this;
+	}
+
+
+};
+
+inline std::string operator<<(std::string &lhs, const Complex32 &rhs) {
+	std::ostringstream string;
+	string << lhs << rhs.c.c[0] << " + " << rhs.c.c[1] << "i";
+	return string.str();
+}
+
+inline std::string operator<<(const char *lhs, const Complex32 &rhs) {
+	std::ostringstream string;
+	string << lhs << rhs.c.c[0] << " + " << rhs.c.c[1] << "i";
+	return string.str();
+}
+
+template<class charT, class traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &o, const Complex32 &x) {
+	std::basic_ostringstream<charT, traits> s;
+	s.flags(o.flags());
+	s.imbue(o.getloc());
+	s.precision(o.precision());
+	s << x.c.c[0] << " + " << x.c.c[1] << "i";
+	return o << s.str();
+}
+
+inline Complex32 operator+(const float &lhs, const Complex32 &rhs) {
+	Complex32 ret(lhs + rhs.c.c[0], 0.0 + rhs.c.c[1]);
+	return ret;
+}
+
+
+inline Complex32 operator-(const float &lhs, const Complex32 &rhs) {
+	Complex32 ret(lhs - rhs.c.c[0], 0.0 - rhs.c.c[1]);
+	return ret;
+}
+
+inline Complex32 operator*(const float &lhs, const Complex32 &rhs) {
+	Complex32 ret(lhs * rhs.c.c[0], lhs * rhs.c.c[1]);
+	return ret;
+}
+
+inline Complex32 operator/(const float &lhs, const Complex32 &rhs) {
+	Complex32 ret;
+	ret.c.c[0] = (lhs * rhs.c.c[0]) / (rhs.c.c[0] * rhs.c.c[0] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.c.c[1] = (-lhs * rhs.c.c[1]) / (rhs.c.c[0] * rhs.c.c[0] + rhs.c.c[1] * rhs.c.c[1]);
+	return ret;
+}
+
+#if defined(AML_USE_STD_COMPLEX)
+
+inline Complex32 operator+(const std::complex<float> &lhs, const Complex32 &rhs) {
+	Complex32 ret = lhs;
+	return ret + rhs;
+}
+
+
+inline Complex32 operator-(const std::complex<float> &lhs, const Complex32 &rhs) {
+	Complex32 ret = lhs;
+	return ret - rhs;
+}
+
+inline Complex32 operator*(const std::complex<float> &lhs, const Complex32 &rhs) {
+	Complex32 ret = lhs;
+	return ret * rhs;
+}
+
+inline Complex32 operator/(const std::complex<float> &lhs, const Complex32 &rhs) {
+	Complex32 ret = lhs;
+	return ret / rhs;
+}
+
+class STD_COMPLEX32_CAST : public std::complex<float> {
+public:
+	inline STD_COMPLEX32_CAST(const Complex32 &other) : std::complex<float>(other.c.c[0], other.c.c[1]) {}
+};
+
+#endif
+
+constexpr Complex32 operator ""_fi(long double d) {
+	return Complex32(0.0f, (float) d);
+}
+
+constexpr Complex32 operator ""_fi(unsigned long long d) {
+	return Complex32(0.0f, (float) d);
+}
+
+#if defined(AML_USE_STD_COMPLEX)
+
+inline std::complex<float> toStdComplex(Complex32 a) {
+	std::complex<float> ret(a.c.c[0], a.c.c[1]);
+	return ret;
+}
+
+#endif
+
+
+class Array2Complex32 {
+public:
+	floatvec2 r{};
+	floatvec2 c{};
+
+	inline Array2Complex32() {}
+
+	inline Array2Complex32(Complex32 value) {
+		r.c[0] = value.c.c[0];
+		c.c[0] = value.c.c[1];
+		r.c[1] = value.c.c[0];
+		c.c[1] = value.c.c[1];
+	}
+
+
+	inline VectorDouble2D real() {
+		return VectorDouble2D(r.c);
+	}
+
+	inline VectorDouble2D complex() {
+		return VectorDouble2D(c.c);
+	}
+
+	inline Complex32 operator[](uint64_t location) {
+		return Complex32(r.c[location], c.c[location]);
+	}
+
+	inline void set(uint64_t location, Complex32 value) {
+		r.c[location] = value.c.c[0];
+		c.c[location] = value.c.c[1];
+	}
+
+	inline Array2Complex32 *add(Array2Complex32 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+		return this;
+	}
+
+	inline Array2Complex32 *add(Complex32 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+		return this;
+	}
+
+	inline void operator+=(Array2Complex32 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+	}
+
+	inline void operator+=(Complex32 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+	}
+
+
+	inline Array2Complex32 operator+(Array2Complex32 a) const {
+		Array2Complex32 ret;
+		ret.c.c[0] = c.c[0] + a.c.c[0];
+		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.r.c[0] = r.c[0] + a.r.c[0];
+		ret.r.c[1] = r.c[1] + a.r.c[1];
+		return ret;
+	}
+
+	inline Array2Complex32 operator+(Complex32 a) const {
+		Array2Complex32 ret;
+		ret.c.c[0] = c.c[0] + a.c.c[1];
+		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.r.c[0] = r.c[0] + a.c.c[0];
+		ret.r.c[1] = r.c[1] + a.c.c[0];
+		return ret;
+	}
+
+	inline Array2Complex32 *add(Array2Complex32 a, VectorU8_2D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] += a.c.c[0];
+			r.c[0] += a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] += a.c.c[1];
+			r.c[1] += a.r.c[1];
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *add(Complex32 a, VectorU8_2D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] += a.c.c[1];
+			r.c[0] += a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] += a.c.c[1];
+			r.c[1] += a.c.c[0];
+		}
+		return this;
+	}
+
+
+	inline Array2Complex32 *subtract(Array2Complex32 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		return this;
+	}
+
+	inline Array2Complex32 *subtract(Complex32 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		return this;
+	}
+
+	inline void operator-=(Array2Complex32 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+	}
+
+	inline void operator-=(Complex32 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+	}
+
+	inline Array2Complex32 operator-(Array2Complex32 a) const {
+		Array2Complex32 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[0];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.r.c[0] = r.c[0] - a.r.c[0];
+		ret.r.c[1] = r.c[1] - a.r.c[1];
+		return ret;
+	}
+
+	inline Array2Complex32 operator-(Complex32 a) const {
+		Array2Complex32 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[1];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.r.c[0] = r.c[0] - a.c.c[0];
+		ret.r.c[1] = r.c[1] - a.c.c[0];
+		return ret;
+	}
+
+	inline Array2Complex32 *subtract(Array2Complex32 a, VectorU8_2D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[0];
+			r.c[0] -= a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.r.c[1];
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *subtract(Complex32 a, VectorU8_2D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[1];
+			r.c[0] -= a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.c.c[0];
+		}
+		return this;
+	}
+
+
+	inline Array2Complex32 operator*(const Array2Complex32 &a) const {
+		Array2Complex32 ret;
+		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+
+
+		return ret;
+	}
+
+	inline Array2Complex32 *multiply(const Array2Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 operator*(const Complex32 &a) const {
+		Array2Complex32 ret;
+		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+
+		return ret;
+	}
+
+	inline void operator*=(const Array2Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+	}
+
+	inline void operator*=(const Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+	}
+
+	inline Array2Complex32 *multiply(const Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *multiply(const Complex32 &a, const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+
+
+	}
+
+	inline Array2Complex32 *multiply(const Array2Complex32 &a, const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *square() {
+		float d1;
+		float d2;
+		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *square(const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *divide(const Complex32 a) {
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *divide(const Complex32 a, const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *divide(const Array2Complex32 &a) {
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *divide(const Array2Complex32 &a, const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 operator/(const Complex32 &a) const {
+		Array2Complex32 ret;
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		return ret;
+	}
+
+	inline Array2Complex32 operator/(const Array2Complex32 &a) const {
+		Array2Complex32 ret;
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		return ret;
+	}
+
+	inline void operator/=(const Complex32 &a) {
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+	}
+
+	inline void operator/=(const Array2Complex32 &a) {
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+	}
+
+	inline Array2Complex32 *sqrt() {
+		float d1;
+		float d2;
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[0]);
+		} else LIKELY {
+			d1 = c.c[0] / (2 * d2);
+		}
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[1]);
+		} else LIKELY {
+			d1 = c.c[1] / (2 * d2);
+		}
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *sqrt(const VectorU8_2D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[0]);
+			} else LIKELY {
+				d1 = c.c[0] / (2 * d2);
+			}
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[1]);
+			} else LIKELY {
+				d1 = c.c[1] / (2 * d2);
+			}
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *sin() {
+		float d1;
+		float d2;
+		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *cos() {
+		float d1;
+		float d2;
+		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *tan() {
+		float d1;
+		float d2;
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *sin(const VectorU8_2D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *cos(const VectorU8_2D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *tan(const VectorU8_2D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *exp() {
+		float d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
+		float d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *exp(float n) {
+		float d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
+		float d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *exp(const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *exp(float n, const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *pow(Array2Complex32 n) {
+		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
+		float d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		float d5 = d3 * ::cos(d4);
+		float d6 = d3 * ::sin(d4);
+		c.c[0] = d5;
+		r.c[0] = d6;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[1] = d5;
+		r.c[1] = d6;
+		return this;
+	}
+
+
+	inline Array2Complex32 *pow(Complex32 n) {
+		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		float d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		float d5 = d3 * ::cos(d4);
+		float d6 = d3 * ::sin(d4);
+		c.c[0] = d5;
+		r.c[0] = d6;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[1] = d5;
+		r.c[1] = d6;
+		return this;
+	}
+
+	inline Array2Complex32 *pow(Array2Complex32 n, const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		float d3;
+		float d4;
+		float d5;
+		float d6;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[0] = d5;
+			r.c[0] = d6;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[1] = d5;
+			r.c[1] = d6;
+		}
+		return this;
+	}
+
+
+	inline Array2Complex32 *pow(Complex32 n, const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		float d3;
+		float d4;
+		float d5;
+		float d6;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[0] = d5;
+			r.c[0] = d6;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[1] = d5;
+			r.c[1] = d6;
+		}
+		return this;
+	}
+
+
+	inline Array2Complex32 *pow(float n) {
+		float d1;
+		float d2;
+		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *pow(float n, const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline VectorDouble2D abs() {
+		VectorDouble2D ret;
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
+		return ret;
+	}
+
+	inline VectorU8_2D abs_gt(float a) {
+		VectorU8_2D ret;
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		return ret;
+	}
+
+	inline VectorU8_2D abs_lt(float a) {
+		VectorU8_2D ret;
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		return ret;
+	}
+
+	inline VectorU8_2D abs_eq(float a) {
+		VectorU8_2D ret;
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		return ret;
+	}
+
+	inline Array2Complex32 *ln(const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *log(const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *log10(const VectorU8_2D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		return this;
+	}
+
+	inline Array2Complex32 *ln() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], c.c[0]);
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		c.c[1] = d1;
+		r.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *log() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], c.c[0]);
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		c.c[1] = d1;
+		r.c[1] = d2;
+		return this;
+	}
+
+	inline Array2Complex32 *log10() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
+		c.c[1] = d1;
+		r.c[1] = d2;
+		return this;
+	}
+};
+
+inline std::string operator<<(std::string &lhs, const Array2Complex32 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	return string.str();
+}
+
+inline std::string operator<<(const char *lhs, const Array2Complex32 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	return string.str();
+}
+
+template<class charT, class traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &o, const Array2Complex32 &rhs) {
+	std::basic_ostringstream<charT, traits> s;
+	s.flags(o.flags());
+	s.imbue(o.getloc());
+	s.precision(o.precision());
+	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	return o << s.str();
+}
+
+inline Array2Complex32 operator+(const Complex32 &lhs, const Array2Complex32 &rhs) {
+	return rhs + lhs;
+}
+
+
+inline Array2Complex32 operator-(const Complex32 &lhs, const Array2Complex32 &rhs) {
+	Array2Complex32 ret;
+	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
+	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
+	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
+	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
+	return ret;
+}
+
+inline Array2Complex32 operator*(const Complex32 &lhs, const Array2Complex32 &rhs) {
+	return rhs * lhs;
+}
+
+inline Array2Complex32 operator/(const Complex32 &lhs, const Array2Complex32 &rhs) {
+	Array2Complex32 ret;
+	float d1 =
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	float d2 =
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	ret.r.c[0] = d1;
+	ret.c.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.r.c[1] = d1;
+	ret.c.c[1] = d2;
+	return ret;
+}
+
+
+class Array4Complex32 {
+public:
+	floatvec4 r{};
+	floatvec4 c{};
+
+	inline Array4Complex32() {}
+
+	inline Array4Complex32(Complex32 value) {
+		r.c[0] = value.c.c[0];
+		c.c[0] = value.c.c[1];
+		r.c[1] = value.c.c[0];
+		c.c[1] = value.c.c[1];
+		r.c[2] = value.c.c[0];
+		c.c[2] = value.c.c[1];
+		r.c[3] = value.c.c[0];
+		c.c[3] = value.c.c[1];
+	}
+
+
+	inline VectorDouble4D real() {
+		return VectorDouble4D(r.c);
+	}
+
+	inline VectorDouble4D complex() {
+		return VectorDouble4D(c.c);
+	}
+
+	inline Complex32 operator[](uint64_t location) {
+		return Complex32(r.c[location], c.c[location]);
+	}
+
+	inline void set(uint64_t location, Complex32 value) {
+		r.c[location] = value.c.c[0];
+		c.c[location] = value.c.c[1];
+	}
+
+	inline Array4Complex32 *add(Array4Complex32 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[2];
+		c.c[3] += a.c.c[3];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+		r.c[2] += a.r.c[2];
+		r.c[3] += a.r.c[3];
+		return this;
+	}
+
+	inline Array4Complex32 *add(Complex32 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[1];
+		c.c[3] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+		r.c[2] += a.c.c[0];
+		r.c[3] += a.c.c[0];
+		return this;
+	}
+
+	inline void operator+=(Array4Complex32 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[2];
+		c.c[3] += a.c.c[3];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+		r.c[2] += a.r.c[2];
+		r.c[3] += a.r.c[3];
+	}
+
+	inline void operator+=(Complex32 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[1];
+		c.c[3] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+		r.c[2] += a.c.c[0];
+		r.c[3] += a.c.c[0];
+	}
+
+
+	inline Array4Complex32 operator+(Array4Complex32 a) const {
+		Array4Complex32 ret{};
+		ret.c.c[0] = c.c[0] + a.c.c[0];
+		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.c.c[2] = c.c[2] + a.c.c[2];
+		ret.c.c[3] = c.c[3] + a.c.c[3];
+		ret.r.c[0] = r.c[0] + a.r.c[0];
+		ret.r.c[1] = r.c[1] + a.r.c[1];
+		ret.r.c[2] = r.c[2] + a.r.c[2];
+		ret.r.c[3] = r.c[3] + a.r.c[3];
+		return ret;
+	}
+
+	inline Array4Complex32 operator+(Complex32 a) const {
+		Array4Complex32 ret{};
+		ret.c.c[0] = c.c[0] + a.c.c[1];
+		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.c.c[2] = c.c[2] + a.c.c[1];
+		ret.c.c[3] = c.c[3] + a.c.c[1];
+		ret.r.c[0] = r.c[0] + a.c.c[0];
+		ret.r.c[1] = r.c[1] + a.c.c[0];
+		ret.r.c[2] = r.c[2] + a.c.c[0];
+		ret.r.c[3] = r.c[3] + a.c.c[0];
+		return ret;
+	}
+
+	inline Array4Complex32 *add(Array4Complex32 a, VectorU8_4D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] += a.c.c[0];
+			r.c[0] += a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] += a.c.c[1];
+			r.c[1] += a.r.c[1];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] += a.c.c[2];
+			r.c[2] += a.r.c[2];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] += a.c.c[3];
+			r.c[3] += a.r.c[3];
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *add(Complex32 a, VectorU8_4D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] += a.c.c[1];
+			r.c[0] += a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] += a.c.c[1];
+			r.c[1] += a.c.c[0];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] += a.c.c[1];
+			r.c[2] += a.c.c[0];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] += a.c.c[1];
+			r.c[3] += a.c.c[0];
+		}
+		return this;
+	}
+
+
+	inline Array4Complex32 *subtract(Array4Complex32 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[2];
+		c.c[3] -= a.c.c[3];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		r.c[2] -= a.r.c[2];
+		r.c[3] -= a.r.c[3];
+		return this;
+	}
+
+	inline Array4Complex32 *subtract(Complex32 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[1];
+		c.c[3] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		r.c[2] -= a.c.c[0];
+		r.c[3] -= a.c.c[0];
+		return this;
+	}
+
+	inline void operator-=(Array4Complex32 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[2];
+		c.c[3] -= a.c.c[3];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		r.c[2] -= a.r.c[2];
+		r.c[3] -= a.r.c[3];
+	}
+
+	inline void operator-=(Complex32 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[1];
+		c.c[3] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		r.c[2] -= a.c.c[0];
+		r.c[3] -= a.c.c[0];
+	}
+
+	inline Array4Complex32 operator-(Array4Complex32 a) const {
+		Array4Complex32 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[0];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.c.c[2] = c.c[2] - a.c.c[2];
+		ret.c.c[3] = c.c[3] - a.c.c[3];
+		ret.r.c[0] = r.c[0] - a.r.c[0];
+		ret.r.c[1] = r.c[1] - a.r.c[1];
+		ret.r.c[2] = r.c[2] - a.r.c[2];
+		ret.r.c[3] = r.c[3] - a.r.c[3];
+		return ret;
+	}
+
+	inline Array4Complex32 operator-(Complex32 a) const {
+		Array4Complex32 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[1];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.c.c[2] = c.c[2] - a.c.c[1];
+		ret.c.c[3] = c.c[3] - a.c.c[1];
+		ret.r.c[0] = r.c[0] - a.c.c[0];
+		ret.r.c[1] = r.c[1] - a.c.c[0];
+		ret.r.c[2] = r.c[2] - a.c.c[0];
+		ret.r.c[3] = r.c[3] - a.c.c[0];
+		return ret;
+	}
+
+	inline Array4Complex32 *subtract(Array4Complex32 a, VectorU8_4D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[0];
+			r.c[0] -= a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.r.c[1];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] -= a.c.c[2];
+			r.c[2] -= a.r.c[2];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] -= a.c.c[3];
+			r.c[3] -= a.r.c[3];
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *subtract(Complex32 a, VectorU8_4D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[1];
+			r.c[0] -= a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.c.c[0];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] -= a.c.c[1];
+			r.c[2] -= a.c.c[0];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] -= a.c.c[1];
+			r.c[3] -= a.c.c[0];
+		}
+		return this;
+	}
+
+
+	inline Array4Complex32 operator*(const Array4Complex32 &a) const {
+		Array4Complex32 ret;
+		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		ret.r.c[2] = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+		ret.c.c[2] = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		ret.r.c[3] = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+		ret.c.c[3] = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+
+
+		return ret;
+	}
+
+	inline Array4Complex32 *multiply(const Array4Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 operator*(const Complex32 &a) const {
+		Array4Complex32 ret;
+		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		ret.r.c[2] = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+		ret.c.c[2] = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		ret.r.c[3] = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+		ret.c.c[3] = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+
+
+		return ret;
+	}
+
+	inline void operator*=(const Array4Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+	}
+
+	inline void operator*=(const Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		r.c[3] = d1;
+		c.c[3] = d2;
+	}
+
+	inline Array4Complex32 *multiply(const Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *multiply(const Complex32 &a, const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+			d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+			d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+
+
+	}
+
+	inline Array4Complex32 *multiply(const Array4Complex32 &a, const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+			d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+			d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *square() {
+		float d1;
+		float d2;
+		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
+		d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
+		d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *square(const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
+			d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
+			d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *divide(const Complex32 a) {
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *divide(const Complex32 a, const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *divide(const Array4Complex32 &a) {
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *divide(const Array4Complex32 &a, const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 operator/(const Complex32 &a) const {
+		Array4Complex32 ret;
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[2] = d1;
+		ret.c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[3] = d1;
+		ret.c.c[3] = d2;
+		return ret;
+	}
+
+	inline Array4Complex32 operator/(const Array4Complex32 &a) const {
+		Array4Complex32 ret;
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		ret.r.c[2] = d1;
+		ret.c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		ret.r.c[3] = d1;
+		ret.c.c[3] = d2;
+		return ret;
+	}
+
+	inline void operator/=(const Complex32 &a) {
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+	}
+
+	inline void operator/=(const Array4Complex32 &a) {
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+	}
+
+	inline Array4Complex32 *sqrt() {
+		float d1;
+		float d2;
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[0]);
+		} else LIKELY {
+			d1 = c.c[0] / (2 * d2);
+		}
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[1]);
+		} else LIKELY {
+			d1 = c.c[1] / (2 * d2);
+		}
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[2]);
+		} else LIKELY {
+			d1 = c.c[2] / (2 * d2);
+		}
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[3]);
+		} else LIKELY {
+			d1 = c.c[3] / (2 * d2);
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *sqrt(const VectorU8_4D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[0]);
+			} else LIKELY {
+				d1 = c.c[0] / (2 * d2);
+			}
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[1]);
+			} else LIKELY {
+				d1 = c.c[1] / (2 * d2);
+			}
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[2]);
+			} else LIKELY {
+				d1 = c.c[2] / (2 * d2);
+			}
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[3]);
+			} else LIKELY {
+				d1 = c.c[3] / (2 * d2);
+			}
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *sin() {
+		float d1;
+		float d2;
+		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
+		d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
+		d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *cos() {
+		float d1;
+		float d2;
+		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
+		d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
+		d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *tan() {
+		float d1;
+		float d2;
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *sin(const VectorU8_4D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
+			d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
+			d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *cos(const VectorU8_4D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
+			d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
+			d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *tan(const VectorU8_4D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+
+	inline Array4Complex32 *exp() {
+		float d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
+		float d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
+		d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
+		d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *exp(float n) {
+		float d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
+		float d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
+		d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
+		d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+		r.c[3] = d1;
+		c.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *exp(const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
+			d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
+			d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *pow(Array4Complex32 n) {
+		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
+		float d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		float d5 = d3 * ::cos(d4);
+		float d6 = d3 * ::sin(d4);
+		c.c[0] = d5;
+		r.c[0] = d6;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[1] = d5;
+		r.c[1] = d6;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], c.c[2]);
+		d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
+		d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[2] = d5;
+		r.c[2] = d6;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], c.c[3]);
+		d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
+		d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[3] = d5;
+		r.c[3] = d6;
+		return this;
+	}
+
+
+	inline Array4Complex32 *pow(Complex32 n) {
+		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		float d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		float d5 = d3 * ::cos(d4);
+		float d6 = d3 * ::sin(d4);
+		c.c[0] = d5;
+		r.c[0] = d6;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[1] = d5;
+		r.c[1] = d6;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], c.c[2]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[2] = d5;
+		r.c[2] = d6;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], c.c[3]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[3] = d5;
+		r.c[3] = d6;
+		return this;
+	}
+
+	inline Array4Complex32 *pow(Array4Complex32 n, const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		float d3;
+		float d4;
+		float d5;
+		float d6;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[0] = d5;
+			r.c[0] = d6;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[1] = d5;
+			r.c[1] = d6;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], c.c[2]);
+			d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
+			d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[2] = d5;
+			r.c[2] = d6;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], c.c[3]);
+			d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
+			d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[3] = d5;
+			r.c[3] = d6;
+		}
+		return this;
+	}
+
+
+	inline Array4Complex32 *pow(Complex32 n, const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		float d3;
+		float d4;
+		float d5;
+		float d6;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[0] = d5;
+			r.c[0] = d6;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[1] = d5;
+			r.c[1] = d6;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], c.c[2]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[2] = d5;
+			r.c[2] = d6;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], c.c[3]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[3] = d5;
+			r.c[3] = d6;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *exp(float n, const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
+			d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
+			d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *pow(float n) {
+		float d1;
+		float d2;
+		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
+		d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
+		d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+		r.c[3] = d1;
+		c.c[3] = d2;
+
+		return this;
+	}
+
+	inline Array4Complex32 *pow(float n, const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
+			d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
+			d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline VectorDouble4D abs() {
+		VectorDouble4D ret;
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
+		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2]);
+		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3]);
+		return ret;
+	}
+
+	inline VectorU8_4D abs_gt(float a) {
+		VectorU8_4D ret;
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[2] = a * a < r.c[2] * r.c[2] + c.c[2] * c.c[2];
+		ret.v.c[3] = a * a < r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		return ret;
+	}
+
+	inline VectorU8_4D abs_lt(float a) {
+		VectorU8_4D ret;
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[2] = a * a > r.c[2] * r.c[2] + c.c[2] * c.c[2];
+		ret.v.c[3] = a * a > r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		return ret;
+	}
+
+	inline VectorU8_4D abs_eq(float a) {
+		VectorU8_4D ret;
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[2] = a * a == r.c[2] * r.c[2] + c.c[2] * c.c[2];
+		ret.v.c[3] = a * a == r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		return ret;
+	}
+
+	inline Array4Complex32 *ln(const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], c.c[2]);
+			c.c[2] = d1;
+			r.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], c.c[3]);
+			c.c[3] = d1;
+			r.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *log(const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], c.c[2]);
+			c.c[2] = d1;
+			r.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], c.c[3]);
+			c.c[3] = d1;
+			r.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *log10(const VectorU8_4D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
+			c.c[2] = d1;
+			r.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
+			c.c[3] = d1;
+			r.c[3] = d2;
+		}
+		return this;
+	}
+
+	inline Array4Complex32 *ln() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], c.c[0]);
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		c.c[1] = d1;
+		r.c[1] = d2;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], c.c[2]);
+		c.c[2] = d1;
+		r.c[2] = d2;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], c.c[3]);
+		c.c[3] = d1;
+		r.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *log() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], c.c[0]);
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		c.c[1] = d1;
+		r.c[1] = d2;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], c.c[2]);
+		c.c[2] = d1;
+		r.c[2] = d2;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], c.c[3]);
+		c.c[3] = d1;
+		r.c[3] = d2;
+		return this;
+	}
+
+	inline Array4Complex32 *log10() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
+		c.c[1] = d1;
+		r.c[1] = d2;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
+		c.c[2] = d1;
+		r.c[2] = d2;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
+		c.c[3] = d1;
+		r.c[3] = d2;
+		return this;
+	}
+};
+
+
+inline std::string operator<<(std::string &lhs, const Array4Complex32 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	return string.str();
+}
+
+inline std::string operator<<(const char *lhs, const Array4Complex32 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	return string.str();
+}
+
+template<class charT, class traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &o, const Array4Complex32 &rhs) {
+	std::basic_ostringstream<charT, traits> s;
+	s.flags(o.flags());
+	s.imbue(o.getloc());
+	s.precision(o.precision());
+	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+	  << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	return o << s.str();
+}
+
+inline Array4Complex32 operator+(const Complex32 &lhs, const Array4Complex32 &rhs) {
+	return rhs + lhs;
+}
+
+
+inline Array4Complex32 operator-(const Complex32 &lhs, const Array4Complex32 &rhs) {
+	Array4Complex32 ret;
+	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
+	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
+	ret.c.c[2] = lhs.c.c[1] - rhs.c.c[2];
+	ret.c.c[3] = lhs.c.c[1] - rhs.c.c[3];
+	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
+	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
+	ret.r.c[2] = lhs.c.c[0] - rhs.r.c[2];
+	ret.r.c[3] = lhs.c.c[0] - rhs.r.c[3];
+	return ret;
+}
+
+inline Array4Complex32 operator*(const Complex32 &lhs, const Array4Complex32 &rhs) {
+	return rhs * lhs;
+}
+
+inline Array4Complex32 operator/(const Complex32 &lhs, const Array4Complex32 &rhs) {
+	Array4Complex32 ret;
+	float d1 =
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	float d2 =
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	ret.r.c[0] = d1;
+	ret.c.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.r.c[1] = d1;
+	ret.c.c[1] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	ret.r.c[2] = d1;
+	ret.c.c[2] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	ret.r.c[3] = d1;
+	ret.c.c[3] = d2;
+	return ret;
+}
+
+
+class Array8Complex32 {
+public:
+	floatvec8 r{};
+	floatvec8 c{};
+
+	inline Array8Complex32() {}
+
+	inline Array8Complex32(Complex32 value) {
+		r.c[0] = value.c.c[0];
+		c.c[0] = value.c.c[1];
+		r.c[1] = value.c.c[0];
+		c.c[1] = value.c.c[1];
+		r.c[2] = value.c.c[0];
+		c.c[2] = value.c.c[1];
+		r.c[3] = value.c.c[0];
+		c.c[3] = value.c.c[1];
+		r.c[4] = value.c.c[0];
+		c.c[4] = value.c.c[1];
+		r.c[5] = value.c.c[0];
+		c.c[5] = value.c.c[1];
+		r.c[6] = value.c.c[0];
+		c.c[6] = value.c.c[1];
+		r.c[7] = value.c.c[0];
+		c.c[7] = value.c.c[1];
+	}
+
+	inline VectorDouble8D real() {
+		return VectorDouble8D(r.c);
+	}
+
+	inline VectorDouble8D complex() {
+		return VectorDouble8D(c.c);
+	}
+
+	inline Complex32 operator[](uint64_t location) {
+		return Complex32(r.c[location], c.c[location]);
+	}
+
+	inline void set(uint64_t location, Complex32 value) {
+		r.c[location] = value.c.c[0];
+		c.c[location] = value.c.c[1];
+	}
+
+	inline Array8Complex32 *add(Array8Complex32 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[2];
+		c.c[3] += a.c.c[3];
+		c.c[4] += a.c.c[4];
+		c.c[5] += a.c.c[5];
+		c.c[6] += a.c.c[6];
+		c.c[7] += a.c.c[7];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+		r.c[2] += a.r.c[2];
+		r.c[3] += a.r.c[3];
+		r.c[4] += a.r.c[4];
+		r.c[5] += a.r.c[5];
+		r.c[6] += a.r.c[6];
+		r.c[7] += a.r.c[7];
+		return this;
+	}
+
+	inline Array8Complex32 *add(Complex32 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[1];
+		c.c[3] += a.c.c[1];
+		c.c[4] += a.c.c[1];
+		c.c[5] += a.c.c[1];
+		c.c[6] += a.c.c[1];
+		c.c[7] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+		r.c[2] += a.c.c[0];
+		r.c[3] += a.c.c[0];
+		r.c[4] += a.c.c[0];
+		r.c[5] += a.c.c[0];
+		r.c[6] += a.c.c[0];
+		r.c[7] += a.c.c[0];
+		return this;
+	}
+
+
+	inline void operator+=(Array8Complex32 a) {
+		c.c[0] += a.c.c[0];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[2];
+		c.c[3] += a.c.c[3];
+		c.c[4] += a.c.c[4];
+		c.c[5] += a.c.c[5];
+		c.c[6] += a.c.c[6];
+		c.c[7] += a.c.c[7];
+		r.c[0] += a.r.c[0];
+		r.c[1] += a.r.c[1];
+		r.c[2] += a.r.c[2];
+		r.c[3] += a.r.c[3];
+		r.c[4] += a.r.c[4];
+		r.c[5] += a.r.c[5];
+		r.c[6] += a.r.c[6];
+		r.c[7] += a.r.c[7];
+	}
+
+	inline void operator+=(Complex32 a) {
+		c.c[0] += a.c.c[1];
+		c.c[1] += a.c.c[1];
+		c.c[2] += a.c.c[1];
+		c.c[3] += a.c.c[1];
+		c.c[4] += a.c.c[1];
+		c.c[5] += a.c.c[1];
+		c.c[6] += a.c.c[1];
+		c.c[7] += a.c.c[1];
+		r.c[0] += a.c.c[0];
+		r.c[1] += a.c.c[0];
+		r.c[2] += a.c.c[0];
+		r.c[3] += a.c.c[0];
+		r.c[4] += a.c.c[0];
+		r.c[5] += a.c.c[0];
+		r.c[6] += a.c.c[0];
+		r.c[7] += a.c.c[0];
+	}
+
+	inline Array8Complex32 operator+(Array8Complex32 a) const {
+		Array8Complex32 ret;
+		ret.c.c[0] = c.c[0] + a.c.c[0];
+		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.c.c[2] = c.c[2] + a.c.c[2];
+		ret.c.c[3] = c.c[3] + a.c.c[3];
+		ret.c.c[4] = c.c[4] + a.c.c[4];
+		ret.c.c[5] = c.c[5] + a.c.c[5];
+		ret.c.c[6] = c.c[6] + a.c.c[6];
+		ret.c.c[7] = c.c[7] + a.c.c[7];
+		ret.r.c[0] = r.c[0] + a.r.c[0];
+		ret.r.c[1] = r.c[1] + a.r.c[1];
+		ret.r.c[2] = r.c[2] + a.r.c[2];
+		ret.r.c[3] = r.c[3] + a.r.c[3];
+		ret.r.c[4] = r.c[4] + a.r.c[4];
+		ret.r.c[5] = r.c[5] + a.r.c[5];
+		ret.r.c[6] = r.c[6] + a.r.c[6];
+		ret.r.c[7] = r.c[7] + a.r.c[7];
+		return ret;
+	}
+
+	inline Array8Complex32 operator+(Complex32 a) const {
+		Array8Complex32 ret;
+		ret.c.c[0] = c.c[0] + a.c.c[1];
+		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.c.c[2] = c.c[2] + a.c.c[1];
+		ret.c.c[3] = c.c[3] + a.c.c[1];
+		ret.c.c[4] = c.c[4] + a.c.c[1];
+		ret.c.c[5] = c.c[5] + a.c.c[1];
+		ret.c.c[6] = c.c[6] + a.c.c[1];
+		ret.c.c[7] = c.c[7] + a.c.c[1];
+		ret.r.c[0] = r.c[0] + a.c.c[0];
+		ret.r.c[1] = r.c[1] + a.c.c[0];
+		ret.r.c[2] = r.c[2] + a.c.c[0];
+		ret.r.c[3] = r.c[3] + a.c.c[0];
+		ret.r.c[4] = r.c[4] + a.c.c[0];
+		ret.r.c[5] = r.c[5] + a.c.c[0];
+		ret.r.c[6] = r.c[6] + a.c.c[0];
+		ret.r.c[7] = r.c[7] + a.c.c[0];
+		return ret;
+	}
+
+	inline Array8Complex32 *add(Array8Complex32 a, VectorU8_8D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] += a.c.c[0];
+			r.c[0] += a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] += a.c.c[1];
+			r.c[1] += a.r.c[1];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] += a.c.c[2];
+			r.c[2] += a.r.c[2];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] += a.c.c[3];
+			r.c[3] += a.r.c[3];
+		}
+		if (mask.v.c[4]) {
+			c.c[4] += a.c.c[4];
+			r.c[4] += a.r.c[4];
+		}
+		if (mask.v.c[5]) {
+			c.c[5] += a.c.c[5];
+			r.c[5] += a.r.c[5];
+		}
+		if (mask.v.c[6]) {
+			c.c[6] += a.c.c[6];
+			r.c[6] += a.r.c[6];
+		}
+		if (mask.v.c[7]) {
+			c.c[7] += a.c.c[7];
+			r.c[7] += a.r.c[7];
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *add(Complex32 a, VectorU8_8D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] += a.c.c[1];
+			r.c[0] += a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] += a.c.c[1];
+			r.c[1] += a.c.c[0];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] += a.c.c[1];
+			r.c[2] += a.c.c[0];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] += a.c.c[1];
+			r.c[3] += a.c.c[0];
+		}
+		if (mask.v.c[4]) {
+			c.c[4] += a.c.c[1];
+			r.c[4] += a.c.c[0];
+		}
+		if (mask.v.c[5]) {
+			c.c[5] += a.c.c[1];
+			r.c[5] += a.c.c[0];
+		}
+		if (mask.v.c[6]) {
+			c.c[6] += a.c.c[1];
+			r.c[6] += a.c.c[0];
+		}
+		if (mask.v.c[7]) {
+			c.c[7] += a.c.c[1];
+			r.c[7] += a.c.c[0];
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *subtract(Array8Complex32 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[2];
+		c.c[3] -= a.c.c[3];
+		c.c[4] -= a.c.c[4];
+		c.c[5] -= a.c.c[5];
+		c.c[6] -= a.c.c[6];
+		c.c[7] -= a.c.c[7];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		r.c[2] -= a.r.c[2];
+		r.c[3] -= a.r.c[3];
+		r.c[4] -= a.r.c[4];
+		r.c[5] -= a.r.c[5];
+		r.c[6] -= a.r.c[6];
+		r.c[7] -= a.r.c[7];
+		return this;
+	}
+
+	inline Array8Complex32 *subtract(Complex32 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[1];
+		c.c[3] -= a.c.c[1];
+		c.c[4] -= a.c.c[1];
+		c.c[5] -= a.c.c[1];
+		c.c[6] -= a.c.c[1];
+		c.c[7] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		r.c[2] -= a.c.c[0];
+		r.c[3] -= a.c.c[0];
+		r.c[4] -= a.c.c[0];
+		r.c[5] -= a.c.c[0];
+		r.c[6] -= a.c.c[0];
+		r.c[7] -= a.c.c[0];
+		return this;
+	}
+
+	inline void operator-=(Array8Complex32 a) {
+		c.c[0] -= a.c.c[0];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[2];
+		c.c[3] -= a.c.c[3];
+		c.c[4] -= a.c.c[4];
+		c.c[5] -= a.c.c[5];
+		c.c[6] -= a.c.c[6];
+		c.c[7] -= a.c.c[7];
+		r.c[0] -= a.r.c[0];
+		r.c[1] -= a.r.c[1];
+		r.c[2] -= a.r.c[2];
+		r.c[3] -= a.r.c[3];
+		r.c[4] -= a.r.c[4];
+		r.c[5] -= a.r.c[5];
+		r.c[6] -= a.r.c[6];
+		r.c[7] -= a.r.c[7];
+	}
+
+	inline void operator-=(Complex32 a) {
+		c.c[0] -= a.c.c[1];
+		c.c[1] -= a.c.c[1];
+		c.c[2] -= a.c.c[1];
+		c.c[3] -= a.c.c[1];
+		c.c[4] -= a.c.c[1];
+		c.c[5] -= a.c.c[1];
+		c.c[6] -= a.c.c[1];
+		c.c[7] -= a.c.c[1];
+		r.c[0] -= a.c.c[0];
+		r.c[1] -= a.c.c[0];
+		r.c[2] -= a.c.c[0];
+		r.c[3] -= a.c.c[0];
+		r.c[4] -= a.c.c[0];
+		r.c[5] -= a.c.c[0];
+		r.c[6] -= a.c.c[0];
+		r.c[7] -= a.c.c[0];
+	}
+
+	inline Array8Complex32 operator-(Array8Complex32 a) const {
+		Array8Complex32 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[0];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.c.c[2] = c.c[2] - a.c.c[2];
+		ret.c.c[3] = c.c[3] - a.c.c[3];
+		ret.c.c[4] = c.c[4] - a.c.c[4];
+		ret.c.c[5] = c.c[5] - a.c.c[5];
+		ret.c.c[6] = c.c[6] - a.c.c[6];
+		ret.c.c[7] = c.c[7] - a.c.c[7];
+		ret.r.c[0] = r.c[0] - a.r.c[0];
+		ret.r.c[1] = r.c[1] - a.r.c[1];
+		ret.r.c[2] = r.c[2] - a.r.c[2];
+		ret.r.c[3] = r.c[3] - a.r.c[3];
+		ret.r.c[4] = r.c[4] - a.r.c[4];
+		ret.r.c[5] = r.c[5] - a.r.c[5];
+		ret.r.c[6] = r.c[6] - a.r.c[6];
+		ret.r.c[7] = r.c[7] - a.r.c[7];
+		return ret;
+	}
+
+	inline Array8Complex32 operator-(Complex32 a) const {
+		Array8Complex32 ret;
+		ret.c.c[0] = c.c[0] - a.c.c[1];
+		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.c.c[2] = c.c[2] - a.c.c[1];
+		ret.c.c[3] = c.c[3] - a.c.c[1];
+		ret.c.c[4] = c.c[4] - a.c.c[1];
+		ret.c.c[5] = c.c[5] - a.c.c[1];
+		ret.c.c[6] = c.c[6] - a.c.c[1];
+		ret.c.c[7] = c.c[7] - a.c.c[1];
+		ret.r.c[0] = r.c[0] - a.c.c[0];
+		ret.r.c[1] = r.c[1] - a.c.c[0];
+		ret.r.c[2] = r.c[2] - a.c.c[0];
+		ret.r.c[3] = r.c[3] - a.c.c[0];
+		ret.r.c[4] = r.c[4] - a.c.c[0];
+		ret.r.c[5] = r.c[5] - a.c.c[0];
+		ret.r.c[6] = r.c[6] - a.c.c[0];
+		ret.r.c[7] = r.c[7] - a.c.c[0];
+		return ret;
+	}
+
+	inline Array8Complex32 *subtract(Array8Complex32 a, VectorU8_8D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[0];
+			r.c[0] -= a.r.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.r.c[1];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] -= a.c.c[2];
+			r.c[2] -= a.r.c[2];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] -= a.c.c[3];
+			r.c[3] -= a.r.c[3];
+		}
+		if (mask.v.c[4]) {
+			c.c[4] -= a.c.c[4];
+			r.c[4] -= a.r.c[4];
+		}
+		if (mask.v.c[5]) {
+			c.c[5] -= a.c.c[5];
+			r.c[5] -= a.r.c[5];
+		}
+		if (mask.v.c[6]) {
+			c.c[6] -= a.c.c[6];
+			r.c[6] -= a.r.c[6];
+		}
+		if (mask.v.c[7]) {
+			c.c[7] -= a.c.c[7];
+			r.c[7] -= a.r.c[7];
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *subtract(Complex32 a, VectorU8_8D mask) {
+		if (mask.v.c[0]) {
+			c.c[0] -= a.c.c[1];
+			r.c[0] -= a.c.c[0];
+		}
+		if (mask.v.c[1]) {
+			c.c[1] -= a.c.c[1];
+			r.c[1] -= a.c.c[0];
+		}
+		if (mask.v.c[2]) {
+			c.c[2] -= a.c.c[1];
+			r.c[2] -= a.c.c[0];
+		}
+		if (mask.v.c[3]) {
+			c.c[3] -= a.c.c[1];
+			r.c[3] -= a.c.c[0];
+		}
+		if (mask.v.c[4]) {
+			c.c[4] -= a.c.c[1];
+			r.c[4] -= a.c.c[0];
+		}
+		if (mask.v.c[5]) {
+			c.c[5] -= a.c.c[1];
+			r.c[5] -= a.c.c[0];
+		}
+		if (mask.v.c[6]) {
+			c.c[6] -= a.c.c[1];
+			r.c[6] -= a.c.c[0];
+		}
+		if (mask.v.c[7]) {
+			c.c[7] -= a.c.c[1];
+			r.c[7] -= a.c.c[0];
+		}
+		return this;
+	}
+
+
+	inline Array8Complex32 operator*(const Array8Complex32 &a) const {
+		Array8Complex32 ret;
+		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		ret.r.c[2] = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+		ret.c.c[2] = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		ret.r.c[3] = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+		ret.c.c[3] = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		ret.r.c[4] = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
+		ret.c.c[4] = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+		ret.r.c[5] = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
+		ret.c.c[5] = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+		ret.r.c[6] = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
+		ret.c.c[6] = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+		ret.r.c[7] = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
+		ret.c.c[7] = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+
+
+		return ret;
+	}
+
+	inline Array8Complex32 *multiply(const Array8Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
+		d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
+		d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
+		d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
+		d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline void operator*=(const Array8Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+
+		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
+		d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
+		d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
+		d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
+		d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		r.c[7] = d1;
+		c.c[7] = d2;
+	}
+
+	inline void operator*=(const Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
+		d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
+		d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
+		d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
+		d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		r.c[7] = d1;
+		c.c[7] = d2;
+	}
+
+	inline Array8Complex32 operator*(const Complex32 &a) const {
+		Array8Complex32 ret;
+		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		ret.r.c[2] = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+		ret.c.c[2] = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		ret.r.c[3] = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+		ret.c.c[3] = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		ret.r.c[4] = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
+		ret.c.c[4] = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+		ret.r.c[5] = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
+		ret.c.c[5] = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+		ret.r.c[6] = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
+		ret.c.c[6] = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+		ret.r.c[7] = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
+		ret.c.c[7] = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+
+
+		return ret;
+	}
+
+	inline Array8Complex32 *multiply(const Complex32 &a) {
+		float d1;
+		float d2;
+		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
+		d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
+		d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
+		d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
+		d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *multiply(const Complex32 &a, const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
+			d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
+			d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
+			d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
+			d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
+			d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
+			d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+
+
+	}
+
+	inline Array8Complex32 *multiply(const Array8Complex32 &a, const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
+			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
+			d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
+			d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
+			d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
+			d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
+			d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
+			d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *square() {
+		float d1;
+		float d2;
+		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
+		d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
+		d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = r.c[4] * r.c[4] - c.c[4] * c.c[4];
+		d2 = r.c[4] * c.c[4] + c.c[4] * r.c[4];
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = r.c[5] * r.c[5] - c.c[5] * c.c[5];
+		d2 = r.c[5] * c.c[5] + c.c[5] * r.c[5];
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = r.c[6] * r.c[6] - c.c[6] * c.c[6];
+		d2 = r.c[6] * c.c[6] + c.c[6] * r.c[6];
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
+		d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
+		r.c[7] = d1;
+		c.c[7] =
+				d2;
+		return this;
+	}
+
+	inline Array8Complex32 *square(const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
+			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
+			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
+			d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
+			d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = r.c[4] * r.c[4] - c.c[4] * c.c[4];
+			d2 = r.c[4] * c.c[4] + c.c[4] * r.c[4];
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = r.c[5] * r.c[5] - c.c[5] * c.c[5];
+			d2 = r.c[5] * c.c[5] + c.c[5] * r.c[5];
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = r.c[6] * r.c[6] - c.c[6] * c.c[6];
+			d2 = r.c[6] * c.c[6] + c.c[6] * r.c[6];
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
+			d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *divide(const Complex32 a) {
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *divide(const Complex32 a, const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *divide(const Array8Complex32 &a) {
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *divide(const Array8Complex32 &a, const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+			d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+			d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+			d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+			d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 operator/(const Complex32 &a) const {
+		Array8Complex32 ret;
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[2] = d1;
+		ret.c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[3] = d1;
+		ret.c.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[4] = d1;
+		ret.c.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[5] = d1;
+		ret.c.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[6] = d1;
+		ret.c.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[7] = d1;
+		ret.c.c[7] = d2;
+		return ret;
+	}
+
+	inline Array8Complex32 operator/(const Array8Complex32 &a) const {
+		Array8Complex32 ret;
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		ret.r.c[0] = d1;
+		ret.c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.r.c[1] = d1;
+		ret.c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		ret.r.c[2] = d1;
+		ret.c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		ret.r.c[3] = d1;
+		ret.c.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		ret.r.c[4] = d1;
+		ret.c.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		ret.r.c[5] = d1;
+		ret.c.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		ret.r.c[6] = d1;
+		ret.c.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		ret.r.c[7] = d1;
+		ret.c.c[7] = d2;
+		return ret;
+	}
+
+	inline void operator/=(const Complex32 &a) {
+		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+	}
+
+	inline void operator/=(const Array8Complex32 &a) {
+		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+	}
+
+	inline Array8Complex32 *sqrt() {
+		float d1;
+		float d2;
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[0]);
+		} else LIKELY {
+			d1 = c.c[0] / (2 * d2);
+		}
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[1]);
+		} else LIKELY {
+			d1 = c.c[1] / (2 * d2);
+		}
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[2]);
+		} else LIKELY {
+			d1 = c.c[2] / (2 * d2);
+		}
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[3]);
+		} else LIKELY {
+			d1 = c.c[3] / (2 * d2);
+		}
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[4]);
+		} else LIKELY {
+			d1 = c.c[4] / (2 * d2);
+		}
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[5]);
+		} else LIKELY {
+			d1 = c.c[5] / (2 * d2);
+		}
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[6]);
+		} else LIKELY {
+			d1 = c.c[6] / (2 * d2);
+		}
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7])) / (2));
+		if (d2 == 0) UNLIKELY {
+			d1 = ::sqrt(r.c[7]);
+		} else LIKELY {
+			d1 = c.c[7] / (2 * d2);
+		}
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *sqrt(const VectorU8_8D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[0]);
+			} else LIKELY {
+				d1 = c.c[0] / (2 * d2);
+			}
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[1]);
+			} else LIKELY {
+				d1 = c.c[1] / (2 * d2);
+			}
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[2]);
+			} else LIKELY {
+				d1 = c.c[2] / (2 * d2);
+			}
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[3]);
+			} else LIKELY {
+				d1 = c.c[3] / (2 * d2);
+			}
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[4]);
+			} else LIKELY {
+				d1 = c.c[4] / (2 * d2);
+			}
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[5]);
+			} else LIKELY {
+				d1 = c.c[5] / (2 * d2);
+			}
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[6]);
+			} else LIKELY {
+				d1 = c.c[6] / (2 * d2);
+			}
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7])) / (2));
+			if (d2 == 0) UNLIKELY {
+				d1 = ::sqrt(r.c[7]);
+			} else LIKELY {
+				d1 = c.c[7] / (2 * d2);
+			}
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *sin() {
+		float d1;
+		float d2;
+		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
+		d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
+		d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::sin(r.c[4]) * ::cosh(c.c[4]);
+		d2 = ::cos(c.c[4]) * ::sinh(r.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::sin(r.c[5]) * ::cosh(c.c[5]);
+		d2 = ::cos(c.c[5]) * ::sinh(r.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::sin(r.c[6]) * ::cosh(c.c[6]);
+		d2 = ::cos(c.c[6]) * ::sinh(r.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::sin(r.c[7]) * ::cosh(c.c[7]);
+		d2 = ::cos(c.c[7]) * ::sinh(r.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *cos() {
+		float d1;
+		float d2;
+		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
+		d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
+		d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::cos(r.c[4]) * ::cosh(c.c[4]);
+		d2 = -::sin(c.c[4]) * ::sinh(r.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::cos(r.c[5]) * ::cosh(c.c[5]);
+		d2 = -::sin(c.c[5]) * ::sinh(r.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::cos(r.c[6]) * ::cosh(c.c[6]);
+		d2 = -::sin(c.c[6]) * ::sinh(r.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::cos(r.c[7]) * ::cosh(c.c[7]);
+		d2 = -::sin(c.c[7]) * ::sinh(r.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *tan() {
+		float d1;
+		float d2;
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+		d2 = ::sinh(c.c[4] + c.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+		d2 = ::sinh(c.c[5] + c.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+		d2 = ::sinh(c.c[6] + c.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+		d2 = ::sinh(c.c[7] + c.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *sin(const VectorU8_8D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
+			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
+			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
+			d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
+			d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::sin(r.c[4]) * ::cosh(c.c[4]);
+			d2 = ::cos(c.c[4]) * ::sinh(r.c[4]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::sin(r.c[5]) * ::cosh(c.c[5]);
+			d2 = ::cos(c.c[5]) * ::sinh(r.c[5]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::sin(r.c[6]) * ::cosh(c.c[6]);
+			d2 = ::cos(c.c[6]) * ::sinh(r.c[6]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::sin(r.c[7]) * ::cosh(c.c[7]);
+			d2 = ::cos(c.c[7]) * ::sinh(r.c[7]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *cos(const VectorU8_8D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
+			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
+			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
+			d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
+			d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::cos(r.c[4]) * ::cosh(c.c[4]);
+			d2 = -::sin(c.c[4]) * ::sinh(r.c[4]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::cos(r.c[5]) * ::cosh(c.c[5]);
+			d2 = -::sin(c.c[5]) * ::sinh(r.c[5]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::cos(r.c[6]) * ::cosh(c.c[6]);
+			d2 = -::sin(c.c[6]) * ::sinh(r.c[6]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::cos(r.c[7]) * ::cosh(c.c[7]);
+			d2 = -::sin(c.c[7]) * ::sinh(r.c[7]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *tan(const VectorU8_8D mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+			d2 = ::sinh(c.c[4] + c.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+			d2 = ::sinh(c.c[5] + c.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+			d2 = ::sinh(c.c[6] + c.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+			d2 = ::sinh(c.c[7] + c.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+
+	inline Array8Complex32 *exp() {
+		float d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
+		float d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
+		d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
+		d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::exp(r.c[4]) * ::cos(c.c[4]);
+		d2 = ::exp(r.c[4]) * ::sin(c.c[4]);
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::exp(r.c[5]) * ::cos(c.c[5]);
+		d2 = ::exp(r.c[5]) * ::sin(c.c[5]);
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::exp(r.c[6]) * ::cos(c.c[6]);
+		d2 = ::exp(r.c[6]) * ::sin(c.c[6]);
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::exp(r.c[7]) * ::cos(c.c[7]);
+		d2 = ::exp(r.c[7]) * ::sin(c.c[7]);
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *exp(float n) {
+		float d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
+		float d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
+		d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
+		d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::pow(n, r.c[4]) * ::cos(c.c[4] * ::log(n));
+		d2 = ::pow(n, r.c[4]) * ::sin(c.c[4] * ::log(n));
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::pow(n, r.c[5]) * ::cos(c.c[5] * ::log(n));
+		d2 = ::pow(n, r.c[5]) * ::sin(c.c[5] * ::log(n));
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::pow(n, r.c[6]) * ::cos(c.c[6] * ::log(n));
+		d2 = ::pow(n, r.c[6]) * ::sin(c.c[6] * ::log(n));
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::pow(n, r.c[7]) * ::cos(c.c[7] * ::log(n));
+		d2 = ::pow(n, r.c[7]) * ::sin(c.c[7] * ::log(n));
+		r.c[7] = d1;
+		c.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *pow(Array8Complex32 n) {
+		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
+		float d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		float d5 = d3 * ::cos(d4);
+		float d6 = d3 * ::sin(d4);
+		c.c[0] = d5;
+		r.c[0] = d6;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[1] = d5;
+		r.c[1] = d6;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], c.c[2]);
+		d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
+		d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[2] = d5;
+		r.c[2] = d6;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], c.c[3]);
+		d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
+		d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[3] = d5;
+		r.c[3] = d6;
+		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], c.c[4]);
+		d3 = ::exp(d1 * n.c.c[4] - d2 * n.r.c[4]);
+		d4 = d1 * n.r.c[4] + d2 * n.c.c[4];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[4] = d5;
+		r.c[4] = d6;
+		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], c.c[5]);
+		d3 = ::exp(d1 * n.c.c[5] - d2 * n.r.c[5]);
+		d4 = d1 * n.r.c[5] + d2 * n.c.c[5];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[5] = d5;
+		r.c[5] = d6;
+		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], c.c[6]);
+		d3 = ::exp(d1 * n.c.c[6] - d2 * n.r.c[6]);
+		d4 = d1 * n.r.c[6] + d2 * n.c.c[6];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[6] = d5;
+		r.c[6] = d6;
+		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], c.c[7]);
+		d3 = ::exp(d1 * n.c.c[7] - d2 * n.r.c[7]);
+		d4 = d1 * n.r.c[7] + d2 * n.c.c[7];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[7] = d5;
+		r.c[7] = d6;
+		return this;
+	}
+
+
+	inline Array8Complex32 *pow(Complex32 n) {
+		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		float d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		float d5 = d3 * ::cos(d4);
+		float d6 = d3 * ::sin(d4);
+		c.c[0] = d5;
+		r.c[0] = d6;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[1] = d5;
+		r.c[1] = d6;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], c.c[2]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[2] = d5;
+		r.c[2] = d6;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], c.c[3]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[3] = d5;
+		r.c[3] = d6;
+		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], c.c[4]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[4] = d5;
+		r.c[4] = d6;
+		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], c.c[5]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[5] = d5;
+		r.c[5] = d6;
+		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], c.c[6]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[6] = d5;
+		r.c[6] = d6;
+		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], c.c[7]);
+		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+		d5 = d3 * ::cos(d4);
+		d6 = d3 * ::sin(d4);
+		c.c[7] = d5;
+		r.c[7] = d6;
+		return this;
+	}
+
+	inline Array8Complex32 *pow(Array8Complex32 n, const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		float d3;
+		float d4;
+		float d5;
+		float d6;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[0] = d5;
+			r.c[0] = d6;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[1] = d5;
+			r.c[1] = d6;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], c.c[2]);
+			d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
+			d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[2] = d5;
+			r.c[2] = d6;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], c.c[3]);
+			d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
+			d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[3] = d5;
+			r.c[3] = d6;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], c.c[4]);
+			d3 = ::exp(d1 * n.c.c[4] - d2 * n.r.c[4]);
+			d4 = d1 * n.r.c[4] + d2 * n.c.c[4];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[4] = d5;
+			r.c[4] = d6;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], c.c[5]);
+			d3 = ::exp(d1 * n.c.c[5] - d2 * n.r.c[5]);
+			d4 = d1 * n.r.c[5] + d2 * n.c.c[5];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[5] = d5;
+			r.c[5] = d6;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], c.c[6]);
+			d3 = ::exp(d1 * n.c.c[6] - d2 * n.r.c[6]);
+			d4 = d1 * n.r.c[6] + d2 * n.c.c[6];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[6] = d5;
+			r.c[6] = d6;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], c.c[7]);
+			d3 = ::exp(d1 * n.c.c[7] - d2 * n.r.c[7]);
+			d4 = d1 * n.r.c[7] + d2 * n.c.c[7];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[7] = d5;
+			r.c[7] = d6;
+		}
+		return this;
+	}
+
+
+	inline Array8Complex32 *pow(Complex32 n, const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		float d3;
+		float d4;
+		float d5;
+		float d6;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[0] = d5;
+			r.c[0] = d6;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[1] = d5;
+			r.c[1] = d6;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], c.c[2]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[2] = d5;
+			r.c[2] = d6;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], c.c[3]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[3] = d5;
+			r.c[3] = d6;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], c.c[4]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[4] = d5;
+			r.c[4] = d6;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], c.c[5]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[5] = d5;
+			r.c[5] = d6;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], c.c[6]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[6] = d5;
+			r.c[6] = d6;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], c.c[7]);
+			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
+			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
+			d5 = d3 * ::cos(d4);
+			d6 = d3 * ::sin(d4);
+			c.c[7] = d5;
+			r.c[7] = d6;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *exp(const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
+			d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
+			d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::exp(r.c[4]) * ::cos(c.c[4]);
+			d2 = ::exp(r.c[4]) * ::sin(c.c[4]);
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::exp(r.c[5]) * ::cos(c.c[5]);
+			d2 = ::exp(r.c[5]) * ::sin(c.c[5]);
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::exp(r.c[6]) * ::cos(c.c[6]);
+			d2 = ::exp(r.c[6]) * ::sin(c.c[6]);
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::exp(r.c[7]) * ::cos(c.c[7]);
+			d2 = ::exp(r.c[7]) * ::sin(c.c[7]);
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *exp(float n, const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
+			d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
+			d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::pow(n, r.c[4]) * ::cos(c.c[4] * ::log(n));
+			d2 = ::pow(n, r.c[4]) * ::sin(c.c[4] * ::log(n));
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::pow(n, r.c[5]) * ::cos(c.c[5] * ::log(n));
+			d2 = ::pow(n, r.c[5]) * ::sin(c.c[5] * ::log(n));
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::pow(n, r.c[6]) * ::cos(c.c[6] * ::log(n));
+			d2 = ::pow(n, r.c[6]) * ::sin(c.c[6] * ::log(n));
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::pow(n, r.c[7]) * ::cos(c.c[7] * ::log(n));
+			d2 = ::pow(n, r.c[7]) * ::sin(c.c[7] * ::log(n));
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *pow(float n) {
+		float d1;
+		float d2;
+		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		r.c[0] = d1;
+		c.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		r.c[1] = d1;
+		c.c[1] = d2;
+		d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
+		d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+		r.c[2] = d1;
+		c.c[2] = d2;
+		d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
+		d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+		r.c[3] = d1;
+		c.c[3] = d2;
+		d1 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::cos(n * atan2(c.c[4], r.c[4]));
+		d2 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::sin(n * atan2(c.c[4], r.c[4]));
+		r.c[4] = d1;
+		c.c[4] = d2;
+		d1 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::cos(n * atan2(c.c[5], r.c[5]));
+		d2 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::sin(n * atan2(c.c[5], r.c[5]));
+		r.c[5] = d1;
+		c.c[5] = d2;
+		d1 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::cos(n * atan2(c.c[6], r.c[6]));
+		d2 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::sin(n * atan2(c.c[6], r.c[6]));
+		r.c[6] = d1;
+		c.c[6] = d2;
+		d1 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::cos(n * atan2(c.c[7], r.c[7]));
+		d2 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::sin(n * atan2(c.c[7], r.c[7]));
+		r.c[7] = d1;
+		c.c[7] = d2;
+
+		return this;
+	}
+
+	inline Array8Complex32 *pow(float n, const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			r.c[0] = d1;
+			c.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			r.c[1] = d1;
+			c.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
+			d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+			r.c[2] = d1;
+			c.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
+			d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+			r.c[3] = d1;
+			c.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::cos(n * atan2(c.c[4], r.c[4]));
+			d2 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::sin(n * atan2(c.c[4], r.c[4]));
+			r.c[4] = d1;
+			c.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::cos(n * atan2(c.c[5], r.c[5]));
+			d2 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::sin(n * atan2(c.c[5], r.c[5]));
+			r.c[5] = d1;
+			c.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::cos(n * atan2(c.c[6], r.c[6]));
+			d2 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::sin(n * atan2(c.c[6], r.c[6]));
+			r.c[6] = d1;
+			c.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::cos(n * atan2(c.c[7], r.c[7]));
+			d2 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::sin(n * atan2(c.c[7], r.c[7]));
+			r.c[7] = d1;
+			c.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline VectorDouble8D abs() {
+		VectorDouble8D ret;
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
+		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2]);
+		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3]);
+		ret.v.c[4] = ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4]);
+		ret.v.c[5] = ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5]);
+		ret.v.c[6] = ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6]);
+		ret.v.c[7] = ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7]);
+		return ret;
+	}
+
+	inline VectorU8_8D abs_gt(float a) {
+		VectorU8_8D ret;
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[2] = a * a < r.c[2] * r.c[2] + c.c[2] * c.c[2];
+		ret.v.c[3] = a * a < r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[4] = a * a < r.c[4] * r.c[4] + c.c[4] * c.c[4];
+		ret.v.c[5] = a * a < r.c[5] * r.c[5] + c.c[5] * c.c[5];
+		ret.v.c[6] = a * a < r.c[6] * r.c[6] + c.c[6] * c.c[6];
+		ret.v.c[7] = a * a < r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		return ret;
+	}
+
+	inline VectorU8_8D abs_lt(float a) {
+		VectorU8_8D ret;
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[2] = a * a > r.c[2] * r.c[2] + c.c[2] * c.c[2];
+		ret.v.c[3] = a * a > r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[4] = a * a > r.c[4] * r.c[4] + c.c[4] * c.c[4];
+		ret.v.c[5] = a * a > r.c[5] * r.c[5] + c.c[5] * c.c[5];
+		ret.v.c[6] = a * a > r.c[6] * r.c[6] + c.c[6] * c.c[6];
+		ret.v.c[7] = a * a > r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		return ret;
+	}
+
+	inline VectorU8_8D abs_eq(float a) {
+		VectorU8_8D ret;
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[2] = a * a == r.c[2] * r.c[2] + c.c[2] * c.c[2];
+		ret.v.c[3] = a * a == r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[4] = a * a == r.c[4] * r.c[4] + c.c[4] * c.c[4];
+		ret.v.c[5] = a * a == r.c[5] * r.c[5] + c.c[5] * c.c[5];
+		ret.v.c[6] = a * a == r.c[6] * r.c[6] + c.c[6] * c.c[6];
+		ret.v.c[7] = a * a == r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		return ret;
+	}
+
+	inline Array8Complex32 *ln(const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], c.c[2]);
+			c.c[2] = d1;
+			r.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], c.c[3]);
+			c.c[3] = d1;
+			r.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], c.c[4]);
+			c.c[4] = d1;
+			r.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], c.c[5]);
+			c.c[5] = d1;
+			r.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], c.c[6]);
+			c.c[6] = d1;
+			r.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], c.c[7]);
+			c.c[7] = d1;
+			r.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *log(const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], c.c[0]);
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], c.c[1]);
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], c.c[2]);
+			c.c[2] = d1;
+			r.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], c.c[3]);
+			c.c[3] = d1;
+			r.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], c.c[4]);
+			c.c[4] = d1;
+			r.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], c.c[5]);
+			c.c[5] = d1;
+			r.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], c.c[6]);
+			c.c[6] = d1;
+			r.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], c.c[7]);
+			c.c[7] = d1;
+			r.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *log10(const VectorU8_8D &mask) {
+		float d1;
+		float d2;
+		if (mask.v.c[0]) {
+			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
+			c.c[0] = d1;
+			r.c[0] = d2;
+		}
+		if (mask.v.c[1]) {
+			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
+			c.c[1] = d1;
+			r.c[1] = d2;
+		}
+		if (mask.v.c[2]) {
+			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
+			c.c[2] = d1;
+			r.c[2] = d2;
+		}
+		if (mask.v.c[3]) {
+			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
+			c.c[3] = d1;
+			r.c[3] = d2;
+		}
+		if (mask.v.c[4]) {
+			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[4], c.c[4]) / AML_LN10;
+			c.c[4] = d1;
+			r.c[4] = d2;
+		}
+		if (mask.v.c[5]) {
+			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[5], c.c[5]) / AML_LN10;
+			c.c[5] = d1;
+			r.c[5] = d2;
+		}
+		if (mask.v.c[6]) {
+			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[6], c.c[6]) / AML_LN10;
+			c.c[6] = d1;
+			r.c[6] = d2;
+		}
+		if (mask.v.c[7]) {
+			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[7], c.c[7]) / AML_LN10;
+			c.c[7] = d1;
+			r.c[7] = d2;
+		}
+		return this;
+	}
+
+	inline Array8Complex32 *ln() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], c.c[0]);
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		c.c[1] = d1;
+		r.c[1] = d2;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], c.c[2]);
+		c.c[2] = d1;
+		r.c[2] = d2;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], c.c[3]);
+		c.c[3] = d1;
+		r.c[3] = d2;
+		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], c.c[4]);
+		c.c[4] = d1;
+		r.c[4] = d2;
+		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], c.c[5]);
+		c.c[5] = d1;
+		r.c[5] = d2;
+		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], c.c[6]);
+		c.c[6] = d1;
+		r.c[6] = d2;
+		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], c.c[7]);
+		c.c[7] = d1;
+		r.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *log() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], c.c[0]);
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], c.c[1]);
+		c.c[1] = d1;
+		r.c[1] = d2;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], c.c[2]);
+		c.c[2] = d1;
+		r.c[2] = d2;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], c.c[3]);
+		c.c[3] = d1;
+		r.c[3] = d2;
+		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], c.c[4]);
+		c.c[4] = d1;
+		r.c[4] = d2;
+		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], c.c[5]);
+		c.c[5] = d1;
+		r.c[5] = d2;
+		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], c.c[6]);
+		c.c[6] = d1;
+		r.c[6] = d2;
+		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], c.c[7]);
+		c.c[7] = d1;
+		r.c[7] = d2;
+		return this;
+	}
+
+	inline Array8Complex32 *log10() {
+		float d1;
+		float d2;
+		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
+		c.c[0] = d1;
+		r.c[0] = d2;
+		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
+		c.c[1] = d1;
+		r.c[1] = d2;
+		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
+		c.c[2] = d1;
+		r.c[2] = d2;
+		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
+		c.c[3] = d1;
+		r.c[3] = d2;
+		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[4], c.c[4]) / AML_LN10;
+		c.c[4] = d1;
+		r.c[4] = d2;
+		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[5], c.c[5]) / AML_LN10;
+		c.c[5] = d1;
+		r.c[5] = d2;
+		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[6], c.c[6]) / AML_LN10;
+		c.c[6] = d1;
+		r.c[6] = d2;
+		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[7], c.c[7]) / AML_LN10;
+		c.c[7] = d1;
+		r.c[7] = d2;
+		return this;
+	}
+
+};
+
+
+inline std::string operator<<(std::string &lhs, const Array8Complex32 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
+		   << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
+		   << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	return string.str();
+}
+
+inline std::string operator<<(const char *lhs, const Array8Complex32 &rhs) {
+	std::ostringstream string;
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
+		   << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
+		   << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	return string.str();
+}
+
+template<class charT, class traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &o, const Array8Complex32 &rhs) {
+	std::basic_ostringstream<charT, traits> s;
+	s.flags(o.flags());
+	s.imbue(o.getloc());
+	s.precision(o.precision());
+	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
+	  << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
+	  << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
+	  << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	return o << s.str();
+}
+
+inline Array8Complex32 operator+(const Complex32 &lhs, const Array8Complex32 &rhs) {
+	return rhs + lhs;
+}
+
+
+inline Array8Complex32 operator-(const Complex32 &lhs, const Array8Complex32 &rhs) {
+	Array8Complex32 ret;
+	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
+	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
+	ret.c.c[2] = lhs.c.c[1] - rhs.c.c[2];
+	ret.c.c[3] = lhs.c.c[1] - rhs.c.c[3];
+	ret.c.c[4] = lhs.c.c[1] - rhs.c.c[4];
+	ret.c.c[5] = lhs.c.c[1] - rhs.c.c[5];
+	ret.c.c[6] = lhs.c.c[1] - rhs.c.c[6];
+	ret.c.c[7] = lhs.c.c[1] - rhs.c.c[7];
+	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
+	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
+	ret.r.c[2] = lhs.c.c[0] - rhs.r.c[2];
+	ret.r.c[3] = lhs.c.c[0] - rhs.r.c[3];
+	ret.r.c[4] = lhs.c.c[0] - rhs.r.c[4];
+	ret.r.c[5] = lhs.c.c[0] - rhs.r.c[5];
+	ret.r.c[6] = lhs.c.c[0] - rhs.r.c[6];
+	ret.r.c[7] = lhs.c.c[0] - rhs.r.c[7];
+	return ret;
+}
+
+inline Array8Complex32 operator*(const Complex32 &lhs, const Array8Complex32 &rhs) {
+	return rhs * lhs;
+}
+
+inline Array8Complex32 operator/(const Complex32 &lhs, const Array8Complex32 &rhs) {
+	Array8Complex32 ret;
+	float d1 =
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	float d2 =
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+	ret.r.c[0] = d1;
+	ret.c.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.r.c[1] = d1;
+	ret.c.c[1] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	ret.r.c[2] = d1;
+	ret.c.c[2] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	ret.r.c[3] = d1;
+	ret.c.c[3] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[4] + lhs.c.c[1] * rhs.c.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.c.c[4] * rhs.c.c[4]);
+	d2 = (lhs.c.c[1] * rhs.r.c[4] - lhs.c.c[0] * rhs.c.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.c.c[4] * rhs.c.c[4]);
+	ret.r.c[4] = d1;
+	ret.c.c[4] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[5] + lhs.c.c[1] * rhs.c.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.c.c[5] * rhs.c.c[5]);
+	d2 = (lhs.c.c[1] * rhs.r.c[5] - lhs.c.c[0] * rhs.c.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.c.c[5] * rhs.c.c[5]);
+	ret.r.c[5] = d1;
+	ret.c.c[5] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[6] + lhs.c.c[1] * rhs.c.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.c.c[6] * rhs.c.c[6]);
+	d2 = (lhs.c.c[1] * rhs.r.c[6] - lhs.c.c[0] * rhs.c.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.c.c[6] * rhs.c.c[6]);
+	ret.r.c[6] = d1;
+	ret.c.c[6] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[7] + lhs.c.c[1] * rhs.c.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.c.c[7] * rhs.c.c[7]);
+	d2 = (lhs.c.c[1] * rhs.r.c[7] - lhs.c.c[0] * rhs.c.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.c.c[7] * rhs.c.c[7]);
+	ret.r.c[7] = d1;
+	ret.c.c[7] = d2;
+	return ret;
+}
 
 #endif //MATH_LIB_A_MATH_LIB_H
