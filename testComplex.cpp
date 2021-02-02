@@ -33,6 +33,27 @@ bool checkEquality(Complex64 a, std::complex<double> b) {
 	return true;
 }
 
+bool checkEquality(Complex32 a, Complex32 b) {
+	if (a.c.c[0] != b.c.c[0]) {
+		return false;
+	}
+	if (a.c.c[1] != b.c.c[1]) {
+		return false;
+	}
+	return true;
+}
+
+
+bool checkEquality(Complex32 a, std::complex<float> b) {
+	if (a.c.c[0] != b.real()) {
+		return false;
+	}
+	if (a.c.c[1] != b.imag()) {
+		return false;
+	}
+	return true;
+}
+
 
 const char *getTruthValue(bool value) {
 	if (value) {

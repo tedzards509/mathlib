@@ -39,7 +39,7 @@
 //#define USE_AVX512F
 //#define USE_KNC
 
-#if __has_cpp_attribute(unlikely) || __has_cpp_attribute(likely)
+#if __has_cpp_attribute(unlikely) && __has_cpp_attribute(likely)
 #define UNLIKELY [[unlikely]]
 #define LIKELY [[likely]]
 
@@ -48,6 +48,13 @@
 #define LIKELY
 
 #endif
+
+#if defined(__cpp_concepts)
+
+#define USE_CONCEPTS
+
+#endif
+
 
 #if defined(__global__)
 
@@ -262,7 +269,7 @@ union floatvec4 {
 #ifdef USE_NEON
 	float32x4_t neon;
 #endif
-	double c[4];
+	float c[4];
 };
 
 union floatvec8 {
@@ -275,7 +282,7 @@ union floatvec8 {
 #ifdef USE_NEON
 	float32x4_t neon[2];
 #endif
-	double c[8];
+	float c[8];
 };
 
 
@@ -283,11 +290,11 @@ union floatvec2 {
 #ifdef USE_NEON
 	float32x2_t neon;
 #endif
-	double c[2];
+	float c[2];
 };
 
 union floatvec1 {
-	double c;
+	float c;
 };
 
 
@@ -411,28 +418,70 @@ union u16vec64 {
 };
 
 namespace AML {
-	inline double
-	mapLinear(double value, const double lowerInput, const double upperInput, const double lowerOutput,
-			  const double upperOutput) {
+
+#if defined(USE_CONCEPTS)
+	template<class T>
+	concept Number = requires(T a, T b){
+		a + a;
+		pow(a, b);
+	};
+#endif
+
+
+#if defined(USE_CONCEPTS)
+
+	template<Number T>
+#else
+	template<class T>
+#endif
+	inline T
+	mapLinear(const T value, const T lowerInput, const T upperInput, const T lowerOutput,
+			  const T upperOutput) {
 		return ((value - lowerInput) * ((upperOutput - lowerOutput) / (upperInput - lowerInput))) + lowerOutput;
 	}
 
-	inline double
-	mapNonLinear(const double value, const double lowerInput, const double upperInput,
-				 const double lowerOutput, const double upperOutput, const double factor) {
+
+#if defined(USE_CONCEPTS)
+
+	template<Number T>
+#else
+	template<class T>
+#endif
+	inline T
+	mapNonLinear(const T value, const T lowerInput, const T upperInput,
+				 const T lowerOutput, const T upperOutput, const T factor) {
 		return (((pow(((value - lowerInput) / (upperInput - lowerInput)), factor)) * (upperOutput - lowerOutput)) +
 				lowerOutput);
 	}
 
-	inline double interpolate(const double min, const double max, const double ratio) {
+
+#if defined(USE_CONCEPTS)
+
+	template<Number T>
+#else
+	template<class T>
+#endif
+	inline T interpolate(const T min, const T max, const T ratio) {
 		return (ratio * (min - max) + max);
 	}
 
-	inline double interpolate(const double val1, const double val2, const double val3, const double ratio) {
+#if defined(USE_CONCEPTS)
+
+	template<Number T>
+#else
+	template<class T>
+#endif
+	inline T interpolate(const T val1, const T val2, const T val3, const T ratio) {
 		return ratio * (ratio * (val1 - val2 - val2 + val3) + val2 + val2 - val3 - val3) + val3;
 	}
 
-	inline double arithmeticMean(double a1, double a2) {
+#if defined(USE_CONCEPTS)
+
+	template<Number T>
+#else
+	template<class T>
+#endif
+	inline T arithmeticMean(T a1, T a2) {
 #if defined(AML_SAVE_MATH)
 		return a1 + (a2 - a1) / 2;
 #else
@@ -978,6 +1027,32 @@ public:
 
 };
 
+class VectorFloat1D {
+public:
+	floatvec1 v{};
+
+	inline VectorFloat1D *set(float value, VectorU8_1D mask) {
+		if (mask.v.c) { v.c = value; }
+		return this;
+	}
+
+	inline VectorFloat1D(const float *const values) {
+		v.c = values[0];
+	}
+
+	inline VectorFloat1D() {
+		v.c = 0.0f;
+	}
+
+	inline VectorFloat1D(float value) {
+		v.c = value;
+	}
+
+	inline float &operator[]([[maybe_unused]]uint32_t location) {
+		return v.c;
+	}
+
+};
 
 class VectorDouble2D {
 public:
@@ -1015,6 +1090,38 @@ public:
 	}
 
 #endif
+
+};
+
+
+class VectorFloat2D {
+public:
+	floatvec2 v{};
+
+	inline VectorFloat2D *set(float value, VectorU8_2D mask) {
+		if (mask.v.c[0]) { v.c[0] = value; }
+		if (mask.v.c[1]) { v.c[1] = value; }
+		return this;
+	}
+
+	inline VectorFloat2D(const float *const values) {
+		v.c[0] = values[0];
+		v.c[1] = values[1];
+	}
+
+	inline VectorFloat2D() {
+		v.c[0] = 0.0f;
+		v.c[1] = 0.0f;
+	}
+
+	inline VectorFloat2D(float value) {
+		v.c[0] = value;
+		v.c[1] = value;
+	}
+
+	inline float &operator[](uint32_t location) {
+		return v.c[location];
+	}
 
 };
 
@@ -1442,6 +1549,286 @@ public:
 #endif
 
 	inline explicit VectorDouble4D(const double *const values) {
+		v.c[0] = values[0];
+		v.c[1] = values[1];
+		v.c[2] = values[2];
+		v.c[3] = values[3];
+	}
+
+};
+
+class VectorFloat4D {
+private:
+
+public:
+	floatvec4 v{};
+
+	inline float &operator[](uint32_t position) {
+		return v.c[position];
+	}
+
+	inline void operator+=(VectorFloat4D vec2) {
+		v.c[0] += vec2[0];
+		v.c[1] += vec2[1];
+		v.c[2] += vec2[2];
+		v.c[3] += vec2[3];
+	}
+
+	inline VectorFloat4D operator+(VectorFloat4D vec2) {
+		VectorFloat4D ret(v.c[0] + vec2.v.c[0], v.c[1] + vec2.v.c[1], v.c[2] + vec2.v.c[2], v.c[3] + vec2.v.c[3]);
+		return ret;
+	}
+
+	inline VectorFloat4D operator+(float a) {
+		VectorFloat4D ret(v.c[0] + a, v.c[1] + a, v.c[2] + a, v.c[3] + a);
+		return ret;
+
+
+	}
+
+	inline VectorFloat4D *add(VectorFloat4D a) {
+		v.c[0] += a.v.c[0];
+		v.c[1] += a.v.c[1];
+		v.c[2] += a.v.c[2];
+		v.c[3] += a.v.c[3];
+		return this;
+	}
+
+	inline void inverse() {
+		v.c[0] = 0 - v.c[0];
+		v.c[1] = 0 - v.c[1];
+		v.c[2] = 0 - v.c[2];
+		v.c[3] = 0 - v.c[3];
+	}
+
+	inline void operator-=(VectorFloat4D vec2) {
+		v.c[0] -= vec2[0];
+		v.c[1] -= vec2[1];
+		v.c[2] -= vec2[2];
+		v.c[3] -= vec2[3];
+
+	}
+
+
+	inline VectorFloat4D operator-(VectorFloat4D vec2) {
+		VectorFloat4D ret(v.c[0] - vec2.v.c[0], v.c[1] - vec2.v.c[1], v.c[2] - vec2.v.c[2], v.c[3] - vec2.v.c[3]);
+		return ret;
+
+
+	}
+
+	inline VectorFloat4D operator-(float a) {
+		VectorFloat4D ret(a);
+		ret = VectorFloat4D(v.c[0] - a, v.c[1] - a, v.c[2] - a, v.c[3] - a);
+		return ret;
+
+
+	}
+
+	inline double length() {
+		return sqrt(v.c[0] * v.c[0] + v.c[1] * v.c[1] + v.c[2] * v.c[2] + v.c[3] * v.c[3]);
+	}
+
+	inline void normalize() {
+		float vecLength = 1 / length();
+		v.c[0] *= vecLength;
+		v.c[1] *= vecLength;
+		v.c[2] *= vecLength;
+		v.c[3] *= vecLength;
+	}
+
+	inline VectorFloat4D *forEachSin() {
+		v.c[0] = sin(v.c[0]);
+		v.c[1] = sin(v.c[1]);
+		v.c[2] = sin(v.c[2]);
+		v.c[3] = sin(v.c[3]);
+		return this;
+	}
+
+	inline void operator*=(float scalar) {
+		v.c[0] *= scalar;
+		v.c[1] *= scalar;
+		v.c[2] *= scalar;
+		v.c[3] *= scalar;
+	}
+
+	// for each multiply
+	inline void operator*=(VectorFloat4D vec2) {
+		v.c[0] *= vec2.v.c[0];
+		v.c[1] *= vec2.v.c[1];
+		v.c[2] *= vec2.v.c[2];
+		v.c[3] *= vec2.v.c[3];
+	}
+
+	inline VectorFloat4D *forEachSqrt() {
+		v.c[0] = sqrt(v.c[0]);
+		v.c[1] = sqrt(v.c[1]);
+		v.c[2] = sqrt(v.c[2]);
+		v.c[3] = sqrt(v.c[3]);
+		return this;
+
+	}
+
+	inline VectorFloat4D operator*(float a) {
+		VectorFloat4D ret;
+		ret.v.c[0] *= v.c[0] * a;
+		ret.v.c[1] *= v.c[1] * a;
+		ret.v.c[2] *= v.c[2] * a;
+		ret.v.c[3] *= v.c[3] * a;
+		return ret;
+	}
+
+	inline VectorFloat4D operator/(float a) {
+		VectorFloat4D ret;
+		ret.v.c[0] /= v.c[0] * a;
+		ret.v.c[1] /= v.c[1] * a;
+		ret.v.c[2] /= v.c[2] * a;
+		ret.v.c[3] /= v.c[3] * a;
+		return ret;
+	}
+
+
+	inline VectorFloat4D *capBetween1_0() {
+		if (v.c[0] > 1) UNLIKELY {
+			v.c[0] = 1;
+		} else if (v.c[0] < 0) UNLIKELY {
+			v.c[0] = 0;
+		}
+		if (v.c[1] > 1) UNLIKELY {
+			v.c[1] = 1;
+		} else if (v.c[1] < 0) UNLIKELY {
+			v.c[1] = 0;
+		}
+		if (v.c[2] > 1) UNLIKELY {
+			v.c[2] = 1;
+		} else if (v.c[2] < 0) UNLIKELY {
+			v.c[2] = 0;
+		}
+		if (v.c[3] > 1) UNLIKELY {
+			v.c[3] = 1;
+		} else if (v.c[3] < 0) UNLIKELY {
+			v.c[3] = 0;
+		}
+		return this;
+	}
+
+	inline VectorFloat4D *capBetweenX_Y(const float upperBoundary, const float lowerBoundary) {
+		if (v.c[0] > upperBoundary) {
+			v.c[0] = upperBoundary;
+		} else if (v.c[0] < lowerBoundary) {
+			v.c[0] = lowerBoundary;
+		}
+		if (v.c[1] > upperBoundary) {
+			v.c[1] = upperBoundary;
+		} else if (v.c[1] < lowerBoundary) {
+			v.c[1] = lowerBoundary;
+		}
+		if (v.c[2] > upperBoundary) {
+			v.c[2] = upperBoundary;
+		} else if (v.c[2] < lowerBoundary) {
+			v.c[2] = lowerBoundary;
+		}
+		if (v.c[3] > upperBoundary) {
+			v.c[3] = upperBoundary;
+		} else if (v.c[3] < lowerBoundary) {
+			v.c[3] = lowerBoundary;
+		}
+		return this;
+	}
+
+	inline VectorFloat4D *
+	map(const float lowerInput, const float upperInput, const float lowerOutput, const float upperOutput) {
+		v.c[0] = ((v.c[0] - lowerInput) * ((upperOutput - lowerOutput) / (upperInput - lowerInput))) + lowerOutput;
+		v.c[1] = ((v.c[1] - lowerInput) * ((upperOutput - lowerOutput) / (upperInput - lowerInput))) + lowerOutput;
+		v.c[2] = ((v.c[2] - lowerInput) * ((upperOutput - lowerOutput) / (upperInput - lowerInput))) + lowerOutput;
+		v.c[3] = ((v.c[3] - lowerInput) * ((upperOutput - lowerOutput) / (upperInput - lowerInput))) + lowerOutput;
+		return this;
+	}
+
+	inline VectorFloat4D *mapNonLinear(const float lowerInput, const float upperInput,
+									   const float lowerOutput, const float upperOutput, const float factor) {
+		v.c[0] = (((pow(((v.c[0] - lowerInput) / (upperInput - lowerInput)), factor)) * (upperOutput - lowerOutput)) +
+				  lowerOutput);
+		v.c[1] = (((pow(((v.c[1] - lowerInput) / (upperInput - lowerInput)), factor)) * (upperOutput - lowerOutput)) +
+				  lowerOutput);
+		v.c[2] = (((pow(((v.c[2] - lowerInput) / (upperInput - lowerInput)), factor)) * (upperOutput - lowerOutput)) +
+				  lowerOutput);
+		v.c[3] = (((pow(((v.c[3] - lowerInput) / (upperInput - lowerInput)), factor)) * (upperOutput - lowerOutput)) +
+				  lowerOutput);
+		return this;
+	}
+
+	inline VectorFloat4D *forEachInterpolate(const float min, const float max) {
+		v.c[0] = (v.c[0] * (min - max) + max);
+		v.c[1] = (v.c[1] * (min - max) + max);
+		v.c[2] = (v.c[2] * (min - max) + max);
+		v.c[3] = (v.c[3] * (min - max) + max);
+		return this;
+	}
+
+	inline VectorFloat4D *interpolate(const VectorFloat4D max, float ratio) {
+		v.c[0] = (ratio * (v.c[0] - max.v.c[0]) + max.v.c[0]);
+		v.c[1] = (ratio * (v.c[1] - max.v.c[1]) + max.v.c[1]);
+		v.c[2] = (ratio * (v.c[2] - max.v.c[2]) + max.v.c[2]);
+		v.c[3] = (ratio * (v.c[3] - max.v.c[3]) + max.v.c[3]);
+		return this;
+	}
+
+	inline VectorFloat4D *interpolate(const VectorFloat4D val2, const VectorFloat4D val3, float ratio) {
+		v.c[0] = ratio *
+				 (ratio * (v.c[0] - val2.v.c[0] - val2.v.c[0] + val3.v.c[0]) + val2.v.c[0] + val2.v.c[0] - val3.v.c[0] -
+				  val3.v.c[0]) + val3.v.c[0];
+		v.c[1] = ratio *
+				 (ratio * (v.c[1] - val2.v.c[1] - val2.v.c[1] + val3.v.c[1]) + val2.v.c[1] + val2.v.c[1] - val3.v.c[1] -
+				  val3.v.c[1]) + val3.v.c[1];
+		v.c[2] = ratio *
+				 (ratio * (v.c[2] - val2.v.c[2] - val2.v.c[2] + val3.v.c[2]) + val2.v.c[2] + val2.v.c[2] - val3.v.c[2] -
+				  val3.v.c[2]) + val3.v.c[2];
+		v.c[3] = ratio *
+				 (ratio * (v.c[3] - val2.v.c[3] - val2.v.c[3] + val3.v.c[3]) + val2.v.c[3] + val2.v.c[3] - val3.v.c[3] -
+				  val3.v.c[3]) + val3.v.c[3];
+		return this;
+	}
+
+	inline VectorFloat4D *set(float value, VectorU8_4D mask) {
+		if (mask.v.c[0]) { v.c[0] = value; }
+		if (mask.v.c[1]) { v.c[1] = value; }
+		if (mask.v.c[2]) { v.c[2] = value; }
+		if (mask.v.c[3]) { v.c[3] = value; }
+		return this;
+	}
+
+	inline VectorFloat4D *set(VectorFloat4D value, VectorU8_4D mask) {
+		if (mask.v.c[0]) { v.c[0] = value.v.c[0]; }
+		if (mask.v.c[1]) { v.c[1] = value.v.c[1]; }
+		if (mask.v.c[2]) { v.c[2] = value.v.c[2]; }
+		if (mask.v.c[3]) { v.c[3] = value.v.c[3]; }
+		return this;
+	}
+
+
+	inline VectorFloat4D(float a, float b, float c, float d) {
+		v.c[0] = a;
+		v.c[1] = b;
+		v.c[2] = c;
+		v.c[3] = d;
+	}
+
+	inline VectorFloat4D() {
+		v.c[0] = 0;
+		v.c[1] = 0;
+		v.c[2] = 0;
+		v.c[3] = 0;
+	}
+
+	inline explicit VectorFloat4D(const float a) {
+		v.c[0] = a;
+		v.c[1] = a;
+		v.c[2] = a;
+		v.c[3] = a;
+	}
+
+	inline explicit VectorFloat4D(const float *const values) {
 		v.c[0] = values[0];
 		v.c[1] = values[1];
 		v.c[2] = values[2];
@@ -1909,6 +2296,95 @@ public:
 	}
 };
 
+
+class VectorFloat8D {
+public:
+	floatvec8 v{};
+
+	inline float operator[](uint32_t position) {
+		return v.c[position];
+	}
+
+	inline void operator+=(const VectorFloat8D &vec2) {
+		v.c[0] += vec2.v.c[0];
+		v.c[1] += vec2.v.c[1];
+		v.c[2] += vec2.v.c[2];
+		v.c[3] += vec2.v.c[3];
+		v.c[4] += vec2.v.c[4];
+		v.c[5] += vec2.v.c[5];
+		v.c[6] += vec2.v.c[6];
+		v.c[7] += vec2.v.c[7];
+
+	}
+
+	inline VectorFloat8D(float a, float b, float c, float d, float e, float f, float g, float h) {
+		v.c[0] = a;
+		v.c[1] = b;
+		v.c[2] = c;
+		v.c[3] = d;
+		v.c[4] = e;
+		v.c[5] = f;
+		v.c[6] = g;
+		v.c[7] = h;
+	}
+
+	inline VectorFloat8D(VectorDouble4D a, VectorDouble4D b) {
+		v.c[0] = a.v.c[0];
+		v.c[1] = a.v.c[1];
+		v.c[2] = a.v.c[2];
+		v.c[3] = a.v.c[3];
+		v.c[4] = b.v.c[0];
+		v.c[5] = b.v.c[1];
+		v.c[6] = b.v.c[2];
+		v.c[7] = b.v.c[3];
+	}
+
+	inline VectorFloat8D() {
+		v.c[0] = 0.0f;
+		v.c[1] = 0.0f;
+		v.c[2] = 0.0f;
+		v.c[3] = 0.0f;
+		v.c[4] = 0.0f;
+		v.c[5] = 0.0f;
+		v.c[6] = 0.0f;
+		v.c[7] = 0.0f;
+	}
+
+	inline explicit VectorFloat8D(const float *const values) {
+		v.c[0] = values[0];
+		v.c[1] = values[1];
+		v.c[2] = values[2];
+		v.c[3] = values[3];
+		v.c[4] = values[4];
+		v.c[5] = values[5];
+		v.c[6] = values[6];
+		v.c[7] = values[7];
+	}
+
+	inline explicit VectorFloat8D(const float value) {
+		v.c[0] = value;
+		v.c[1] = value;
+		v.c[2] = value;
+		v.c[3] = value;
+		v.c[4] = value;
+		v.c[5] = value;
+		v.c[6] = value;
+		v.c[7] = value;
+	}
+
+	inline VectorFloat8D *set(const float value, VectorU8_8D mask) {
+		if (mask.v.c[0]) { v.c[0] = value; }
+		if (mask.v.c[1]) { v.c[1] = value; }
+		if (mask.v.c[2]) { v.c[2] = value; }
+		if (mask.v.c[3]) { v.c[3] = value; }
+		if (mask.v.c[4]) { v.c[4] = value; }
+		if (mask.v.c[5]) { v.c[5] = value; }
+		if (mask.v.c[6]) { v.c[6] = value; }
+		if (mask.v.c[7]) { v.c[7] = value; }
+		return this;
+	}
+};
+
 #if defined(USE_AVX512)
 
 #define MAX_COMPLEX_64_SIZE 8
@@ -1919,15 +2395,23 @@ public:
 #define IDEAL_COMPLEX_64_TYPE Array8Complex64
 #define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_8D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble8D
+#define MIN_COMPLEX_64_SIZE 4
+#define MIN_COMPLEX_64_TYPE Array4Complex64
+#define MIN_COMPLEX_64_MASK_TYPE VectorU8_4D
+#define MIN_COMPLEX_64_VECTOR_TYPE VectorDouble4D
 
-#define MAX_COMPLEX_32_SIZE 16
+#define MAX_COMPLEX_32_SIZE 8
 #define MAX_COMPLEX_32_TYPE Array8Complex32
-#define MAX_COMPLEX_32_MASK_TYPE VectorU8_16D
-#define MAX_COMPLEX_32_VECTOR_TYPE VectorDouble16D
-#define IDEAL_COMPLEX_32_SIZE 16
+#define MAX_COMPLEX_32_MASK_TYPE VectorU8_8D
+#define MAX_COMPLEX_32_VECTOR_TYPE VectorFloat8D
+#define IDEAL_COMPLEX_32_SIZE 8
 #define IDEAL_COMPLEX_32_TYPE Array8Complex32
-#define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_16D
-#define IDEAL_COMPLEX_32_VECTOR_TYPE VectorDouble16D
+#define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_8D
+#define IDEAL_COMPLEX_32_VECTOR_TYPE VectorFloat8D
+#define MIN_COMPLEX_32_SIZE 4
+#define MIN_COMPLEX_32_TYPE Array2Complex32
+#define MIN_COMPLEX_32_MASK_TYPE VectorU8_4D
+#define MIN_COMPLEX_32_VECTOR_TYPE VectorDouble4D
 
 
 #elif defined(USE_AVX)
@@ -1940,15 +2424,23 @@ public:
 #define IDEAL_COMPLEX_64_TYPE Array4Complex64
 #define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_4D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble4D
+#define MINL_COMPLEX_64_SIZE 2
+#define MINL_COMPLEX_64_TYPE Array2Complex64
+#define MIN_COMPLEX_64_MASK_TYPE VectorU8_2D
+#define MIN_COMPLEX_64_VECTOR_TYPE VectorDouble2D
 
-#define MAX_COMPLEX_32_SIZE 16
+#define MAX_COMPLEX_32_SIZE 8
 #define MAX_COMPLEX_32_TYPE Array8Complex32
-#define MAX_COMPLEX_32_MASK_TYPE VectorU8_16D
-#define MAX_COMPLEX_32_VECTOR_TYPE VectorDouble16D
+#define MAX_COMPLEX_32_MASK_TYPE VectorU8_8D
+#define MAX_COMPLEX_32_VECTOR_TYPE VectorFloat8D
 #define IDEAL_COMPLEX_32_SIZE 8
-#define IDEAL_COMPLEX_32_TYPE Array4Complex34
+#define IDEAL_COMPLEX_32_TYPE Array8Complex32
 #define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_8D
-#define IDEAL_COMPLEX_32_VECTOR_TYPE VectorDouble8D
+#define IDEAL_COMPLEX_32_VECTOR_TYPE VectorFloat8D
+#define MIN_COMPLEX_32_SIZE 4
+#define MIN_COMPLEX_32_TYPE Array4Complex32
+#define MIN_COMPLEX_32_MASK_TYPE VectorU8_4D
+#define MIN_COMPLEX_32_VECTOR_TYPE VectorFloat4D
 
 
 #elif defined(USE_SSE) || defined(USE_NEON) || defined(USE_WASM_SIMD)
@@ -1961,6 +2453,10 @@ public:
 #define IDEAL_COMPLEX_64_TYPE Array2Complex64
 #define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_2D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble2D
+#define MIN_COMPLEX_64_SIZE 1
+#define MIN_COMPLEX_64_TYPE Complex64
+#define MIN_COMPLEX_64_MASK_TYPE VectorU8_1D
+#define MIN_COMPLEX_64_VECTOR_TYPE VectorDouble1D
 
 
 #define MAX_COMPLEX_32_SIZE 8
@@ -1968,9 +2464,13 @@ public:
 #define MAX_COMPLEX_32_MASK_TYPE VectorU8_8D
 #define MAX_COMPLEX_32_VECTOR_TYPE VectorFloat8D
 #define IDEAL_COMPLEX_32_SIZE 4
-#define IDEAL_COMPLEX_32_TYPE Array2Complex32
+#define IDEAL_COMPLEX_32_TYPE Array4Complex32
 #define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_4D
 #define IDEAL_COMPLEX_32_VECTOR_TYPE VectorFloat4D
+#define MIN_COMPLEX_32_SIZE 2
+#define MIN_COMPLEX_32_TYPE Array2Complex32
+#define MIN_COMPLEX_32_MASK_TYPE VectorU8_2D
+#define MIN_COMPLEX_32_VECTOR_TYPE VectorFloat2D
 
 
 #else
@@ -1984,15 +2484,23 @@ public:
 #define IDEAL_COMPLEX_64_TYPE Complex64
 #define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_1D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble1D
+#define MIN_COMPLEX_64_SIZE 1
+#define MIN_COMPLEX_64_TYPE Complex64
+#define MIN_COMPLEX_64_MASK_TYPE VectorU8_1D
+#define MIN_COMPLEX_64_VECTOR_TYPE VectorDouble1D
 
 #define MAX_COMPLEX_32_SIZE 1
 #define MAX_COMPLEX_32_TYPE Complex32
-#define MAX_COMPLEX_32_MASK_TYPE bool
-#define MAX_COMPLEX_32_VECTOR_TYPE float
+#define MAX_COMPLEX_32_MASK_TYPE VectorU8_1D
+#define MAX_COMPLEX_32_VECTOR_TYPE VectorFloat1D
 #define IDEAL_COMPLEX_32_SIZE 1
 #define IDEAL_COMPLEX_32_TYPE Complex32
-#define IDEAL_COMPLEX_32_MASK_TYPE bool
-#define IDEAL_COMPLEX_32_VECTOR_TYPE float
+#define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_1D
+#define IDEAL_COMPLEX_32_VECTOR_TYPE VectorFloat1D
+#define MIN_COMPLEX_32_SIZE 1
+#define MIN_COMPLEX_32_TYPE Complex32
+#define MIN_COMPLEX_32_MASK_TYPE VectorU8_1D
+#define MIN_COMPLEX_32_VECTOR_TYPE VectorFloat1D
 
 
 #endif
@@ -2001,8 +2509,7 @@ class Complex64 {
 public:
 	doublevec2 c{};
 
-
-	inline constexpr Complex64(const double real, const double img) {
+	inline constexpr Complex64(const double real, const double img = 0.0) {
 		c.c[0] = real;
 		c.c[1] = img;
 	}
@@ -2010,11 +2517,6 @@ public:
 	inline explicit Complex64(double *values) {
 		c.c[0] = values[0];
 		c.c[1] = values[1];
-	}
-
-	inline constexpr Complex64(double real) {
-		c.c[0] = real;
-		c.c[1] = 0.0;
 	}
 
 #if defined(AML_USE_STD_COMPLEX)
@@ -2026,10 +2528,7 @@ public:
 
 #endif
 
-	inline Complex64() {
-		c.c[0] = 0;
-		c.c[1] = 0;
-	}
+	inline Complex64() = default;
 
 	inline void set([[maybe_unused]]uint64_t location, Complex64 value) {
 		c.c[0] = value.c.c[0];
@@ -8237,12 +8736,12 @@ public:
 	}
 
 
-	inline VectorDouble2D real() {
-		return VectorDouble2D(r.c);
+	inline VectorFloat2D real() {
+		return VectorFloat2D(r.c);
 	}
 
-	inline VectorDouble2D complex() {
-		return VectorDouble2D(c.c);
+	inline VectorFloat2D complex() {
+		return VectorFloat2D(c.c);
 	}
 
 	inline Complex32 operator[](uint64_t location) {
@@ -8993,8 +9492,8 @@ public:
 		return this;
 	}
 
-	inline VectorDouble2D abs() {
-		VectorDouble2D ret;
+	inline VectorFloat2D abs() {
+		VectorFloat2D ret;
 		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
 		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
 		return ret;
@@ -9194,12 +9693,12 @@ public:
 	}
 
 
-	inline VectorDouble4D real() {
-		return VectorDouble4D(r.c);
+	inline VectorFloat4D real() {
+		return VectorFloat4D(r.c);
 	}
 
-	inline VectorDouble4D complex() {
-		return VectorDouble4D(c.c);
+	inline VectorFloat4D complex() {
+		return VectorFloat4D(c.c);
 	}
 
 	inline Complex32 operator[](uint64_t location) {
@@ -10416,8 +10915,8 @@ public:
 		return this;
 	}
 
-	inline VectorDouble4D abs() {
-		VectorDouble4D ret;
+	inline VectorFloat4D abs() {
+		VectorFloat4D ret;
 		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
 		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
 		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2]);
@@ -10708,12 +11207,12 @@ public:
 		c.c[7] = value.c.c[1];
 	}
 
-	inline VectorDouble8D real() {
-		return VectorDouble8D(r.c);
+	inline VectorFloat8D real() {
+		return VectorFloat8D(r.c);
 	}
 
-	inline VectorDouble8D complex() {
-		return VectorDouble8D(c.c);
+	inline VectorFloat8D complex() {
+		return VectorFloat8D(c.c);
 	}
 
 	inline Complex32 operator[](uint64_t location) {
@@ -12860,8 +13359,8 @@ public:
 		return this;
 	}
 
-	inline VectorDouble8D abs() {
-		VectorDouble8D ret;
+	inline VectorFloat8D abs() {
+		VectorFloat8D ret;
 		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
 		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
 		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2]);
@@ -13291,5 +13790,6 @@ inline Array8Complex32 operator/(const Complex32 &lhs, const Array8Complex32 &rh
 	ret.c.c[7] = d2;
 	return ret;
 }
+
 
 #endif //MATH_LIB_A_MATH_LIB_H

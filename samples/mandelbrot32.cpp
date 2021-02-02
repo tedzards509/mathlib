@@ -1,25 +1,26 @@
 //
-// Created by af on 26.01.21.
-//
+// Created by af on 02.02.21.
+
 #define AML_USE_STD_COMPLEX
 
 #include <stdint.h>
 #include "../amathlib.h"
 #include <iostream>
 #include <chrono>
+
 /*
  * This sample shows how to implement the mandelbrot set in C++. It is implemented in two ways a fast and a slow one.
  * It is recommended to know what the mandelbrot set is, not only because it makes it easy to follow, but because it is a
  * beautiful part of mathematics. Refer to https://en.wikipedia.org/wiki/Mandelbrot_set when needed.
  *
- * To compile on x86-64 choose clang or gcc and run
+ * To compile on x86-32 choose clang or gcc and run
  * 		clang++ -O3 -ffast-math -march=native mandelbrot.cpp -o mandelbrot
  *	OR
  *		g++ -O3 -ffast-math -march=native mandelbrot.cpp -o mandelbrot
  *
  * "-O3" and "-ffast-math" are optimisation flags, you can try to run the code with just "-O0" or without -march=native
  *
- * On non x86-64 platforms remove -march=native
+ * On non x86-32 platforms remove -march=native
  */
 
 uint64_t getTime() {
@@ -33,32 +34,32 @@ int accuracy = 100000;    // example values way to high, just to get useful timi
 int main() {
 	std::cout << "width recommended 250" << std::endl;
 	std::string input;
-	std::getline(std::cin, input);
-	if (!input.empty()) {
-		std::istringstream stream(input);
-		stream >> width;
-	}
+	//std::getline(std::cin, input);
+	//if (!input.empty()) {
+	//	std::istringstream stream(input);
+	//	stream >> width;
+	//}
 	std::cout << "height recommended 80" << std::endl;
-	std::getline(std::cin, input);
-	if (!input.empty()) {
-		std::istringstream stream(input);
-		stream >> height;
-	}
+	//std::getline(std::cin, input);
+	//if (!input.empty()) {
+	//	std::istringstream stream(input);
+	//	stream >> height;
+	//}
 	std::cout << "accuracy recommended 100000" << std::endl;
-	std::getline(std::cin, input);
-	if (!input.empty()) {
-		std::istringstream stream(input);
-		stream >> accuracy;
-	}
-	uint32_t begin;
-	uint32_t end;
+	//std::getline(std::cin, input);
+	//if (!input.empty()) {
+	//	std::istringstream stream(input);
+	//	stream >> accuracy;
+	//}
+	uint64_t begin;
+	uint64_t end;
 
 	begin = getTime();
 	for (int x = 0; x < height; x++) {
 		for (int y = 0; y < width; y++) {
-			std::complex<double> c(((double) x) / ((double) height / 2.0f) - 1.5f,
-								   ((double) y) / ((double) width / 2.0f) - 1.0f);
-			std::complex<double> z = c;
+			std::complex<float> c(((double) x) / ((double) height / 2.0f) - 1.5f,
+								  ((double) y) / ((double) width / 2.0f) - 1.0f);
+			std::complex<float> z = c;
 			int i = 0;
 			int result = accuracy;
 			for (; i < accuracy; ++i) {
@@ -83,8 +84,8 @@ int main() {
 	begin = getTime();
 	for (int x = 0; x < height; x++) {
 		for (int y = 0; y < width; y++) {
-			Complex64 c(((double) x) / ((double) height / 2.0f) - 1.5f, ((double) y) / ((double) width / 2.0f) - 1.0f);
-			Complex64 z = c;
+			Complex32 c(((double) x) / ((double) height / 2.0f) - 1.5f, ((double) y) / ((double) width / 2.0f) - 1.0f);
+			Complex32 z = c;
 			int i = 0;
 			int result = accuracy;
 			for (; i < accuracy; ++i) {
@@ -109,24 +110,24 @@ int main() {
 
 	begin = getTime();
 	for (int x = 0; x < height; x++) {
-		for (int y = 0; y < width / IDEAL_COMPLEX_64_SIZE; y++) {
-			IDEAL_COMPLEX_64_TYPE complex64_C;
-			IDEAL_COMPLEX_64_TYPE complex64_Z;
-			for (int index = 0; index < IDEAL_COMPLEX_64_SIZE; index++) {
-				complex64_C.set(index, Complex64(AML::mapLinear((double) x, 0.0, (double) height, -1.5, 0.5),
-												 AML::mapLinear((double) y * IDEAL_COMPLEX_64_SIZE + index, 0.0,
-																(double) width,
-																-1.0, 1.0)));
+		for (int y = 0; y < width / MIN_COMPLEX_32_SIZE; y++) {
+			MIN_COMPLEX_32_TYPE complex32_C;
+			MIN_COMPLEX_32_TYPE complex32_Z;
+			for (int index = 0; index < MIN_COMPLEX_32_SIZE; index++) {
+				complex32_C.set(index, Complex32(AML::mapLinear((float) x, 0.0f, (float) height, -1.5f, 0.5f),
+												 AML::mapLinear((float) y * MIN_COMPLEX_32_SIZE + index, 0.0f,
+																(float) width,
+																-1.0f, 1.0f)));
 			}
-			complex64_Z = complex64_C;
-			IDEAL_COMPLEX_64_VECTOR_TYPE result(accuracy);
+			complex32_Z = complex32_C;
+			MIN_COMPLEX_32_VECTOR_TYPE result(accuracy);
 			int i = 0;
-			IDEAL_COMPLEX_64_MASK_TYPE finished;
-			IDEAL_COMPLEX_64_MASK_TYPE nowFinished;
-			IDEAL_COMPLEX_64_MASK_TYPE alreadyFinished;
+			MIN_COMPLEX_32_MASK_TYPE finished;
+			MIN_COMPLEX_32_MASK_TYPE nowFinished;
+			MIN_COMPLEX_32_MASK_TYPE alreadyFinished;
 			for (; i < accuracy; ++i) {
-				complex64_Z = (complex64_Z * complex64_Z) + complex64_C;
-				finished = complex64_Z.abs_gt(2);
+				complex32_Z = (complex32_Z * complex32_Z) + complex32_C;
+				finished = complex32_Z.abs_gt(2);
 				bool anyFinished = finished.anyTrue();
 				if (anyFinished) {
 					alreadyFinished = finished;
@@ -136,9 +137,9 @@ int main() {
 			}
 			if (!(finished.allTrue())) {
 				for (; i < accuracy; ++i) {
-					complex64_Z.square(!finished)->add(complex64_C, !finished);
-					//complex64_Z = (complex64_Z * complex64_Z) + complex64_C; Identical result but slower on my machine
-					finished = complex64_Z.abs_gt(2);
+					complex32_Z.square(!finished)->add(complex32_C, !finished);
+					//complex32_Z = (complex32_Z * complex32_Z) + complex32_C; Identical result but slower on my machine
+					finished = complex32_Z.abs_gt(2);
 					nowFinished = finished && !alreadyFinished;
 					if (nowFinished.anyTrue()) {
 						alreadyFinished = finished;
@@ -149,7 +150,7 @@ int main() {
 					}
 				}
 			}
-			for (int index = 0; index < IDEAL_COMPLEX_64_SIZE; index++) {
+			for (int index = 0; index < MIN_COMPLEX_32_SIZE; index++) {
 				if (result[index] >= accuracy) {
 					std::cout << "#";
 				} else {

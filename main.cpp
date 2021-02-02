@@ -24,6 +24,10 @@ int main() {
 	std::cout << "USE_AVX" << std::endl;
 #endif
 
+#if defined(USE_CONCEPTS)
+	std::cout << "C++ 20" << std::endl;
+#endif
+
 	std::cout << "size : " << sizeof(VectorDouble4D) << " align : " << alignof(VectorDouble4D) << std::endl;
 	std::cout << "size double : " << sizeof(double) << " size float : " << sizeof(float) << std::endl;
 	std::cout << "size : " << sizeof(Complex32) << " align : " << alignof(Complex32) << std::endl;
