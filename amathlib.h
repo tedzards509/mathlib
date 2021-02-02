@@ -2409,7 +2409,7 @@ public:
 #define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_8D
 #define IDEAL_COMPLEX_32_VECTOR_TYPE VectorFloat8D
 #define MIN_COMPLEX_32_SIZE 4
-#define MIN_COMPLEX_32_TYPE Array2Complex32
+#define MIN_COMPLEX_32_TYPE Array4Complex32
 #define MIN_COMPLEX_32_MASK_TYPE VectorU8_4D
 #define MIN_COMPLEX_32_VECTOR_TYPE VectorDouble4D
 
