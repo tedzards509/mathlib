@@ -423,6 +423,8 @@ namespace AML {
 	template<class T>
 	concept Number = requires(T a, T b){
 		a + a;
+		a * a;
+		a / a;
 		pow(a, b);
 	};
 #endif
@@ -2424,8 +2426,8 @@ public:
 #define IDEAL_COMPLEX_64_TYPE Array4Complex64
 #define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_4D
 #define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble4D
-#define MINL_COMPLEX_64_SIZE 2
-#define MINL_COMPLEX_64_TYPE Array2Complex64
+#define MIN_COMPLEX_64_SIZE 2
+#define MIN_COMPLEX_64_TYPE Array2Complex64
 #define MIN_COMPLEX_64_MASK_TYPE VectorU8_2D
 #define MIN_COMPLEX_64_VECTOR_TYPE VectorDouble2D
 
@@ -2460,13 +2462,42 @@ public:
 
 
 #define MAX_COMPLEX_32_SIZE 8
-#define MAX_COMPLEX_32_TYPE Array4Complex32
+#define MAX_COMPLEX_32_TYPE Array8Complex32
 #define MAX_COMPLEX_32_MASK_TYPE VectorU8_8D
 #define MAX_COMPLEX_32_VECTOR_TYPE VectorFloat8D
 #define IDEAL_COMPLEX_32_SIZE 4
 #define IDEAL_COMPLEX_32_TYPE Array4Complex32
 #define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_4D
 #define IDEAL_COMPLEX_32_VECTOR_TYPE VectorFloat4D
+#define MIN_COMPLEX_32_SIZE 2
+#define MIN_COMPLEX_32_TYPE Array2Complex32
+#define MIN_COMPLEX_32_MASK_TYPE VectorU8_2D
+#define MIN_COMPLEX_32_VECTOR_TYPE VectorFloat2D
+
+#elif defined(AML_USE_ARRAY_STRICT)
+
+#define MAX_COMPLEX_64_SIZE 2
+#define MAX_COMPLEX_64_TYPE Array2Complex64
+#define MAX_COMPLEX_64_MASK_TYPE VectorU8_2D
+#define MAX_COMPLEX_64_VECTOR_TYPE VectorDouble2D
+#define IDEAL_COMPLEX_64_SIZE 2
+#define IDEAL_COMPLEX_64_TYPE Array2Complex64
+#define IDEAL_COMPLEX_64_MASK_TYPE VectorU8_2D
+#define IDEAL_COMPLEX_64_VECTOR_TYPE VectorDouble2D
+#define MIN_COMPLEX_64_SIZE 2
+#define MIN_COMPLEX_64_TYPE Array2Complex64
+#define MIN_COMPLEX_64_MASK_TYPE VectorU8_2D
+#define MIN_COMPLEX_64_VECTOR_TYPE VectorDouble2D
+
+
+#define MAX_COMPLEX_32_SIZE 2
+#define MAX_COMPLEX_32_TYPE Array2Complex32
+#define MAX_COMPLEX_32_MASK_TYPE VectorU8_2D
+#define MAX_COMPLEX_32_VECTOR_TYPE VectorFloat2D
+#define IDEAL_COMPLEX_32_SIZE 2
+#define IDEAL_COMPLEX_32_TYPE Array2Complex32
+#define IDEAL_COMPLEX_32_MASK_TYPE VectorU8_2D
+#define IDEAL_COMPLEX_32_VECTOR_TYPE VectorFloat2D
 #define MIN_COMPLEX_32_SIZE 2
 #define MIN_COMPLEX_32_TYPE Array2Complex32
 #define MIN_COMPLEX_32_MASK_TYPE VectorU8_2D
@@ -2550,12 +2581,12 @@ public:
 		return this;
 	}
 
-	inline Complex64 operator+(Complex64 a) {
+	inline Complex64 operator+(const Complex64 a) const {
 		Complex64 ret(c.c[0] + a.c.c[0], c.c[1] + a.c.c[1]);
 		return ret;
 	}
 
-	inline Complex64 operator-(Complex64 a) {
+	inline Complex64 operator-(const Complex64 a) const {
 		Complex64 ret(c.c[0] - a.c.c[0], c.c[1] - a.c.c[1]);
 		return ret;
 	}
@@ -2615,7 +2646,7 @@ public:
 
 	}
 
-	inline Complex64 operator*(Complex64 a) {
+	inline Complex64 operator*(Complex64 a) const {
 		Complex64 ret(c.c[0] * a.c.c[0] - c.c[1] * a.c.c[1], c.c[0] * a.c.c[1] + c.c[1] * a.c.c[0]);
 		return ret;
 	}
@@ -2652,7 +2683,7 @@ public:
 	}
 
 //division
-	inline Complex64 operator/(Complex64 a) {
+	inline Complex64 operator/(const Complex64 a) const {
 		Complex64 ret;
 		ret.c.c[0] = (c.c[0] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.c.c[1] = (c.c[1] * a.c.c[0] - c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
@@ -2984,6 +3015,43 @@ public:
 
 };
 
+
+class Complex64Ptr : public Complex64 {
+	double *r;
+	double *i;
+	uint32_t index = 0;
+public:
+	inline Complex64Ptr(double *real, double *imag) : Complex64(*real, *imag) {
+		r = real;
+		i = imag;
+	}
+
+	inline Complex64Ptr(double *real, double *imag, uint32_t position) : Complex64(*real, *imag) {
+		r = real;
+		i = imag;
+		index = position;
+	}
+
+	inline Complex64 &operator*() {
+		return *this;
+	}
+
+	inline ~Complex64Ptr() {
+		*r = c.c[0];
+		*i = c.c[1];
+	}
+
+	inline void operator()() {
+		*r = c.c[0];
+		*i = c.c[1];
+	}
+
+	inline uint32_t getIndex() {
+		return index;
+	}
+};
+
+
 inline std::string operator<<(std::string &lhs, const Complex64 &rhs) {
 	std::ostringstream string;
 	string << lhs << rhs.c.c[0] << " + " << rhs.c.c[1] << "i";
@@ -3078,15 +3146,15 @@ inline std::complex<double> toStdComplex(Complex64 a) {
 class Array2Complex64 {
 public:
 	doublevec2 r{};
-	doublevec2 c{};
+	doublevec2 i{};
 
 	inline Array2Complex64() {}
 
 	inline Array2Complex64(Complex64 value) {
 		r.c[0] = value.c.c[0];
-		c.c[0] = value.c.c[1];
+		i.c[0] = value.c.c[1];
 		r.c[1] = value.c.c[0];
-		c.c[1] = value.c.c[1];
+		i.c[1] = value.c.c[1];
 	}
 
 
@@ -3095,44 +3163,44 @@ public:
 	}
 
 	inline VectorDouble2D complex() {
-		return VectorDouble2D(c.c);
+		return VectorDouble2D(i.c);
 	}
 
 	inline Complex64 operator[](uint64_t location) {
-		return Complex64(r.c[location], c.c[location]);
+		return Complex64(r.c[location], i.c[location]);
 	}
 
 	inline void set(uint64_t location, Complex64 value) {
 		r.c[location] = value.c.c[0];
-		c.c[location] = value.c.c[1];
+		i.c[location] = value.c.c[1];
 	}
 
 	inline Array2Complex64 *add(Array2Complex64 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		return this;
 	}
 
 	inline Array2Complex64 *add(Complex64 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		return this;
 	}
 
 	inline void operator+=(Array2Complex64 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 	}
 
 	inline void operator+=(Complex64 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 	}
@@ -3140,8 +3208,8 @@ public:
 
 	inline Array2Complex64 operator+(Array2Complex64 a) const {
 		Array2Complex64 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[0];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.i.c[0] = i.c[0] + a.i.c[0];
+		ret.i.c[1] = i.c[1] + a.i.c[1];
 		ret.r.c[0] = r.c[0] + a.r.c[0];
 		ret.r.c[1] = r.c[1] + a.r.c[1];
 		return ret;
@@ -3149,8 +3217,8 @@ public:
 
 	inline Array2Complex64 operator+(Complex64 a) const {
 		Array2Complex64 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[1];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.i.c[0] = i.c[0] + a.c.c[1];
+		ret.i.c[1] = i.c[1] + a.c.c[1];
 		ret.r.c[0] = r.c[0] + a.c.c[0];
 		ret.r.c[1] = r.c[1] + a.c.c[0];
 		return ret;
@@ -3158,11 +3226,11 @@ public:
 
 	inline Array2Complex64 *add(Array2Complex64 a, VectorU8_2D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[0];
+			i.c[0] += a.i.c[0];
 			r.c[0] += a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.i.c[1];
 			r.c[1] += a.r.c[1];
 		}
 		return this;
@@ -3170,11 +3238,11 @@ public:
 
 	inline Array2Complex64 *add(Complex64 a, VectorU8_2D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[1];
+			i.c[0] += a.c.c[1];
 			r.c[0] += a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.c.c[1];
 			r.c[1] += a.c.c[0];
 		}
 		return this;
@@ -3182,39 +3250,39 @@ public:
 
 
 	inline Array2Complex64 *subtract(Array2Complex64 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		return this;
 	}
 
 	inline Array2Complex64 *subtract(Complex64 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		return this;
 	}
 
 	inline void operator-=(Array2Complex64 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 	}
 
 	inline void operator-=(Complex64 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 	}
 
 	inline Array2Complex64 operator-(Array2Complex64 a) const {
 		Array2Complex64 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[0];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.i.c[0] = i.c[0] - a.i.c[0];
+		ret.i.c[1] = i.c[1] - a.i.c[1];
 		ret.r.c[0] = r.c[0] - a.r.c[0];
 		ret.r.c[1] = r.c[1] - a.r.c[1];
 		return ret;
@@ -3222,8 +3290,8 @@ public:
 
 	inline Array2Complex64 operator-(Complex64 a) const {
 		Array2Complex64 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[1];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.i.c[0] = i.c[0] - a.c.c[1];
+		ret.i.c[1] = i.c[1] - a.c.c[1];
 		ret.r.c[0] = r.c[0] - a.c.c[0];
 		ret.r.c[1] = r.c[1] - a.c.c[0];
 		return ret;
@@ -3231,11 +3299,11 @@ public:
 
 	inline Array2Complex64 *subtract(Array2Complex64 a, VectorU8_2D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[0];
+			i.c[0] -= a.i.c[0];
 			r.c[0] -= a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.i.c[1];
 			r.c[1] -= a.r.c[1];
 		}
 		return this;
@@ -3243,11 +3311,11 @@ public:
 
 	inline Array2Complex64 *subtract(Complex64 a, VectorU8_2D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[1];
+			i.c[0] -= a.c.c[1];
 			r.c[0] -= a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.c.c[1];
 			r.c[1] -= a.c.c[0];
 		}
 		return this;
@@ -3256,10 +3324,10 @@ public:
 
 	inline Array2Complex64 operator*(const Array2Complex64 &a) const {
 		Array2Complex64 ret;
-		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		ret.r.c[0] = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		ret.i.c[0] = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		ret.i.c[1] = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 
 
 		return ret;
@@ -3268,24 +3336,24 @@ public:
 	inline Array2Complex64 *multiply(const Array2Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
 	inline Array2Complex64 operator*(const Complex64 &a) const {
 		Array2Complex64 ret;
-		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		ret.r.c[0] = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		ret.i.c[0] = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		ret.i.c[1] = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 
 		return ret;
 	}
@@ -3293,39 +3361,39 @@ public:
 	inline void operator*=(const Array2Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 	}
 
 	inline void operator*=(const Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 	}
 
 	inline Array2Complex64 *multiply(const Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -3333,16 +3401,16 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 
@@ -3353,16 +3421,16 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+			d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+			d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -3370,14 +3438,14 @@ public:
 	inline Array2Complex64 *square() {
 		double d1;
 		double d2;
-		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+		d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		i.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+		d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -3385,29 +3453,29 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+			d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+			d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex64 *divide(const Complex64 a) {
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -3415,29 +3483,29 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex64 *divide(const Array2Complex64 &a) {
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -3445,87 +3513,87 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.i.c[0] + i.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[0] * a.i.c[0] - r.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex64 operator/(const Complex64 &a) const {
 		Array2Complex64 ret;
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
+		ret.i.c[1] = d2;
 		return ret;
 	}
 
 	inline Array2Complex64 operator/(const Array2Complex64 &a) const {
 		Array2Complex64 ret;
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
+		ret.i.c[1] = d2;
 		return ret;
 	}
 
 	inline void operator/=(const Complex64 &a) {
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 	}
 
 	inline void operator/=(const Array2Complex64 &a) {
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 	}
 
 	inline Array2Complex64 *sqrt() {
 		double d1;
 		double d2;
-		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[0]);
 		} else LIKELY {
-			d1 = c.c[0] / (2 * d2);
+			d1 = i.c[0] / (2 * d2);
 		}
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		i.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[1]);
 		} else LIKELY {
-			d1 = c.c[1] / (2 * d2);
+			d1 = i.c[1] / (2 * d2);
 		}
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -3533,24 +3601,24 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[0]);
 			} else LIKELY {
-				d1 = c.c[0] / (2 * d2);
+				d1 = i.c[0] / (2 * d2);
 			}
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[1]);
 			} else LIKELY {
-				d1 = c.c[1] / (2 * d2);
+				d1 = i.c[1] / (2 * d2);
 			}
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -3558,42 +3626,42 @@ public:
 	inline Array2Complex64 *sin() {
 		double d1;
 		double d2;
-		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+		d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+		d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
 	inline Array2Complex64 *cos() {
 		double d1;
 		double d2;
-		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+		d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+		d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
 	inline Array2Complex64 *tan() {
 		double d1;
 		double d2;
-		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+		d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+		d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -3601,16 +3669,16 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+			d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+			d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -3619,16 +3687,16 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+			d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+			d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -3637,41 +3705,41 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+			d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+			d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex64 *exp() {
-		double d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-		double d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		double d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+		double d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		i.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
 	inline Array2Complex64 *exp(double n) {
-		double d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-		double d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		double d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+		double d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		i.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -3679,16 +3747,16 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -3697,57 +3765,57 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex64 *pow(Array2Complex64 n) {
-		double d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		double d2 = ::atan2(r.c[0], c.c[0]);
-		double d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-		double d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		double d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		double d2 = ::atan2(r.c[0], i.c[0]);
+		double d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+		double d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 		double d5 = d3 * ::cos(d4);
 		double d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
 		return this;
 	}
 
 
 	inline Array2Complex64 *pow(Complex64 n) {
-		double d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		double d2 = ::atan2(r.c[0], c.c[0]);
+		double d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		double d2 = ::atan2(r.c[0], i.c[0]);
 		double d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		double d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		double d5 = d3 * ::cos(d4);
 		double d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
 		return this;
 	}
@@ -3760,23 +3828,23 @@ public:
 		double d5;
 		double d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		return this;
@@ -3791,23 +3859,23 @@ public:
 		double d5;
 		double d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		return this;
@@ -3817,14 +3885,14 @@ public:
 	inline Array2Complex64 *pow(double n) {
 		double d1;
 		double d2;
-		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		i.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -3832,45 +3900,45 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline VectorDouble2D abs() {
 		VectorDouble2D ret;
-		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
-		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1]);
 		return ret;
 	}
 
 	inline VectorU8_2D abs_gt(double a) {
 		VectorU8_2D ret;
-		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + i.c[1] * i.c[1];
 		return ret;
 	}
 
 	inline VectorU8_2D abs_lt(double a) {
 		VectorU8_2D ret;
-		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + i.c[1] * i.c[1];
 		return ret;
 	}
 
 	inline VectorU8_2D abs_eq(double a) {
 		VectorU8_2D ret;
-		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + i.c[1] * i.c[1];
 		return ret;
 	}
 
@@ -3878,15 +3946,15 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		return this;
@@ -3896,15 +3964,15 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		return this;
@@ -3914,15 +3982,15 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		return this;
@@ -3931,13 +3999,13 @@ public:
 	inline Array2Complex64 *ln() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
 		return this;
 	}
@@ -3945,13 +4013,13 @@ public:
 	inline Array2Complex64 *log() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
 		return this;
 	}
@@ -3959,27 +4027,65 @@ public:
 	inline Array2Complex64 *log10() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+		i.c[1] = d1;
 		r.c[1] = d2;
 		return this;
+	}
+
+	class Complex64_2_Itr : public std::iterator<
+			std::input_iterator_tag,   // iterator_category
+			Complex64Ptr,                      // value_type
+			long,                      // difference_type
+			const Complex64Ptr *,               // pointer
+			Complex64Ptr                       // reference
+	> {
+
+		Array2Complex64 *a;
+		int position;
+
+	public:
+		inline explicit Complex64_2_Itr(Array2Complex64 *array, int length) : a(array), position(length) {
+
+		}
+
+		inline Complex64_2_Itr &operator++() {
+			position++;
+			return *this;
+		}
+
+		inline bool operator==(Complex64_2_Itr other) const { return position == other.position; }
+
+		inline bool operator!=(Complex64_2_Itr other) const { return !(*this == other); }
+
+		inline reference operator*() const { return Complex64Ptr(&a->r.c[position], &a->i.c[position], position); }
+
+
+	};
+
+	inline Complex64_2_Itr begin() {
+		return Complex64_2_Itr(this, 0);
+	}
+
+	inline Complex64_2_Itr end() {
+		return Complex64_2_Itr(this, 2);
 	}
 };
 
 inline std::string operator<<(std::string &lhs, const Array2Complex64 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1] << "i }";
 	return string.str();
 }
 
 inline std::string operator<<(const char *lhs, const Array2Complex64 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1] << "i }";
 	return string.str();
 }
 
@@ -3990,7 +4096,7 @@ operator<<(std::basic_ostream<charT, traits> &o, const Array2Complex64 &rhs) {
 	s.flags(o.flags());
 	s.imbue(o.getloc());
 	s.precision(o.precision());
-	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	s << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1] << "i }";
 	return o << s.str();
 }
 
@@ -4000,8 +4106,8 @@ inline Array2Complex64 operator+(const Complex64 &lhs, const Array2Complex64 &rh
 
 inline Array2Complex64 operator-(const Complex64 &lhs, const Array2Complex64 &rhs) {
 	Array2Complex64 ret;
-	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
-	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
+	ret.i.c[0] = lhs.c.c[1] - rhs.i.c[0];
+	ret.i.c[1] = lhs.c.c[1] - rhs.i.c[1];
 	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
 	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
 	return ret;
@@ -4014,34 +4120,34 @@ inline Array2Complex64 operator*(const Complex64 &lhs, const Array2Complex64 &rh
 inline Array2Complex64 operator/(const Complex64 &lhs, const Array2Complex64 &rhs) {
 	Array2Complex64 ret;
 	double d1 =
-			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	double d2 =
-			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	ret.r.c[0] = d1;
-	ret.c.c[0] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
-	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.i.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
 	ret.r.c[1] = d1;
-	ret.c.c[1] = d2;
+	ret.i.c[1] = d2;
 	return ret;
 }
 
 class Array4Complex64 {
 public:
 	doublevec4 r{};
-	doublevec4 c{};
+	doublevec4 i{};
 
 	inline Array4Complex64() {}
 
 	inline Array4Complex64(Complex64 value) {
 		r.c[0] = value.c.c[0];
-		c.c[0] = value.c.c[1];
+		i.c[0] = value.c.c[1];
 		r.c[1] = value.c.c[0];
-		c.c[1] = value.c.c[1];
+		i.c[1] = value.c.c[1];
 		r.c[2] = value.c.c[0];
-		c.c[2] = value.c.c[1];
+		i.c[2] = value.c.c[1];
 		r.c[3] = value.c.c[0];
-		c.c[3] = value.c.c[1];
+		i.c[3] = value.c.c[1];
 	}
 
 
@@ -4050,23 +4156,23 @@ public:
 	}
 
 	inline VectorDouble4D complex() {
-		return VectorDouble4D(c.c);
+		return VectorDouble4D(i.c);
 	}
 
 	inline Complex64 operator[](uint64_t location) {
-		return Complex64(r.c[location], c.c[location]);
+		return Complex64(r.c[location], i.c[location]);
 	}
 
 	inline void set(uint64_t location, Complex64 value) {
 		r.c[location] = value.c.c[0];
-		c.c[location] = value.c.c[1];
+		i.c[location] = value.c.c[1];
 	}
 
 	inline Array4Complex64 *add(Array4Complex64 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[2];
-		c.c[3] += a.c.c[3];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
+		i.c[2] += a.i.c[2];
+		i.c[3] += a.i.c[3];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
@@ -4075,10 +4181,10 @@ public:
 	}
 
 	inline Array4Complex64 *add(Complex64 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[1];
-		c.c[3] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
+		i.c[2] += a.c.c[1];
+		i.c[3] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
@@ -4087,10 +4193,10 @@ public:
 	}
 
 	inline void operator+=(Array4Complex64 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[2];
-		c.c[3] += a.c.c[3];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
+		i.c[2] += a.i.c[2];
+		i.c[3] += a.i.c[3];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
@@ -4098,10 +4204,10 @@ public:
 	}
 
 	inline void operator+=(Complex64 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[1];
-		c.c[3] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
+		i.c[2] += a.c.c[1];
+		i.c[3] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
@@ -4111,10 +4217,10 @@ public:
 
 	inline Array4Complex64 operator+(Array4Complex64 a) const {
 		Array4Complex64 ret{};
-		ret.c.c[0] = c.c[0] + a.c.c[0];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.c.c[2] = c.c[2] + a.c.c[2];
-		ret.c.c[3] = c.c[3] + a.c.c[3];
+		ret.i.c[0] = i.c[0] + a.i.c[0];
+		ret.i.c[1] = i.c[1] + a.i.c[1];
+		ret.i.c[2] = i.c[2] + a.i.c[2];
+		ret.i.c[3] = i.c[3] + a.i.c[3];
 		ret.r.c[0] = r.c[0] + a.r.c[0];
 		ret.r.c[1] = r.c[1] + a.r.c[1];
 		ret.r.c[2] = r.c[2] + a.r.c[2];
@@ -4124,10 +4230,10 @@ public:
 
 	inline Array4Complex64 operator+(Complex64 a) const {
 		Array4Complex64 ret{};
-		ret.c.c[0] = c.c[0] + a.c.c[1];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.c.c[2] = c.c[2] + a.c.c[1];
-		ret.c.c[3] = c.c[3] + a.c.c[1];
+		ret.i.c[0] = i.c[0] + a.c.c[1];
+		ret.i.c[1] = i.c[1] + a.c.c[1];
+		ret.i.c[2] = i.c[2] + a.c.c[1];
+		ret.i.c[3] = i.c[3] + a.c.c[1];
 		ret.r.c[0] = r.c[0] + a.c.c[0];
 		ret.r.c[1] = r.c[1] + a.c.c[0];
 		ret.r.c[2] = r.c[2] + a.c.c[0];
@@ -4137,19 +4243,19 @@ public:
 
 	inline Array4Complex64 *add(Array4Complex64 a, VectorU8_4D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[0];
+			i.c[0] += a.i.c[0];
 			r.c[0] += a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.i.c[1];
 			r.c[1] += a.r.c[1];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] += a.c.c[2];
+			i.c[2] += a.i.c[2];
 			r.c[2] += a.r.c[2];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] += a.c.c[3];
+			i.c[3] += a.i.c[3];
 			r.c[3] += a.r.c[3];
 		}
 		return this;
@@ -4157,19 +4263,19 @@ public:
 
 	inline Array4Complex64 *add(Complex64 a, VectorU8_4D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[1];
+			i.c[0] += a.c.c[1];
 			r.c[0] += a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.c.c[1];
 			r.c[1] += a.c.c[0];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] += a.c.c[1];
+			i.c[2] += a.c.c[1];
 			r.c[2] += a.c.c[0];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] += a.c.c[1];
+			i.c[3] += a.c.c[1];
 			r.c[3] += a.c.c[0];
 		}
 		return this;
@@ -4177,10 +4283,10 @@ public:
 
 
 	inline Array4Complex64 *subtract(Array4Complex64 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[2];
-		c.c[3] -= a.c.c[3];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
+		i.c[2] -= a.i.c[2];
+		i.c[3] -= a.i.c[3];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
@@ -4189,10 +4295,10 @@ public:
 	}
 
 	inline Array4Complex64 *subtract(Complex64 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[1];
-		c.c[3] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
+		i.c[2] -= a.c.c[1];
+		i.c[3] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
@@ -4201,10 +4307,10 @@ public:
 	}
 
 	inline void operator-=(Array4Complex64 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[2];
-		c.c[3] -= a.c.c[3];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
+		i.c[2] -= a.i.c[2];
+		i.c[3] -= a.i.c[3];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
@@ -4212,10 +4318,10 @@ public:
 	}
 
 	inline void operator-=(Complex64 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[1];
-		c.c[3] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
+		i.c[2] -= a.c.c[1];
+		i.c[3] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
@@ -4224,10 +4330,10 @@ public:
 
 	inline Array4Complex64 operator-(Array4Complex64 a) const {
 		Array4Complex64 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[0];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
-		ret.c.c[2] = c.c[2] - a.c.c[2];
-		ret.c.c[3] = c.c[3] - a.c.c[3];
+		ret.i.c[0] = i.c[0] - a.i.c[0];
+		ret.i.c[1] = i.c[1] - a.i.c[1];
+		ret.i.c[2] = i.c[2] - a.i.c[2];
+		ret.i.c[3] = i.c[3] - a.i.c[3];
 		ret.r.c[0] = r.c[0] - a.r.c[0];
 		ret.r.c[1] = r.c[1] - a.r.c[1];
 		ret.r.c[2] = r.c[2] - a.r.c[2];
@@ -4237,10 +4343,10 @@ public:
 
 	inline Array4Complex64 operator-(Complex64 a) const {
 		Array4Complex64 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[1];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
-		ret.c.c[2] = c.c[2] - a.c.c[1];
-		ret.c.c[3] = c.c[3] - a.c.c[1];
+		ret.i.c[0] = i.c[0] - a.c.c[1];
+		ret.i.c[1] = i.c[1] - a.c.c[1];
+		ret.i.c[2] = i.c[2] - a.c.c[1];
+		ret.i.c[3] = i.c[3] - a.c.c[1];
 		ret.r.c[0] = r.c[0] - a.c.c[0];
 		ret.r.c[1] = r.c[1] - a.c.c[0];
 		ret.r.c[2] = r.c[2] - a.c.c[0];
@@ -4250,19 +4356,19 @@ public:
 
 	inline Array4Complex64 *subtract(Array4Complex64 a, VectorU8_4D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[0];
+			i.c[0] -= a.i.c[0];
 			r.c[0] -= a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.i.c[1];
 			r.c[1] -= a.r.c[1];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] -= a.c.c[2];
+			i.c[2] -= a.i.c[2];
 			r.c[2] -= a.r.c[2];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] -= a.c.c[3];
+			i.c[3] -= a.i.c[3];
 			r.c[3] -= a.r.c[3];
 		}
 		return this;
@@ -4270,19 +4376,19 @@ public:
 
 	inline Array4Complex64 *subtract(Complex64 a, VectorU8_4D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[1];
+			i.c[0] -= a.c.c[1];
 			r.c[0] -= a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.c.c[1];
 			r.c[1] -= a.c.c[0];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] -= a.c.c[1];
+			i.c[2] -= a.c.c[1];
 			r.c[2] -= a.c.c[0];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] -= a.c.c[1];
+			i.c[3] -= a.c.c[1];
 			r.c[3] -= a.c.c[0];
 		}
 		return this;
@@ -4291,14 +4397,14 @@ public:
 
 	inline Array4Complex64 operator*(const Array4Complex64 &a) const {
 		Array4Complex64 ret;
-		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
-		ret.r.c[2] = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		ret.c.c[2] = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
-		ret.r.c[3] = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		ret.c.c[3] = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		ret.r.c[0] = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		ret.i.c[0] = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		ret.i.c[1] = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
+		ret.r.c[2] = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		ret.i.c[2] = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
+		ret.r.c[3] = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		ret.i.c[3] = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 
 
 		return ret;
@@ -4307,36 +4413,36 @@ public:
 	inline Array4Complex64 *multiply(const Array4Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
 	inline Array4Complex64 operator*(const Complex64 &a) const {
 		Array4Complex64 ret;
-		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
-		ret.r.c[2] = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		ret.c.c[2] = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
-		ret.r.c[3] = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		ret.c.c[3] = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		ret.r.c[0] = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		ret.i.c[0] = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		ret.i.c[1] = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
+		ret.r.c[2] = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		ret.i.c[2] = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
+		ret.r.c[3] = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		ret.i.c[3] = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 
 
 		return ret;
@@ -4345,65 +4451,65 @@ public:
 	inline void operator*=(const Array4Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 	}
 
 	inline void operator*=(const Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 	}
 
 	inline Array4Complex64 *multiply(const Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -4411,28 +4517,28 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-			d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+			d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+			d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-			d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+			d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+			d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 
@@ -4443,28 +4549,28 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+			d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+			d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-			d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+			d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+			d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-			d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+			d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+			d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -4472,22 +4578,22 @@ public:
 	inline Array4Complex64 *square() {
 		double d1;
 		double d2;
-		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+		d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		i.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+		d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
-		d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * r.c[2] - i.c[2] * i.c[2];
+		d2 = r.c[2] * i.c[2] + i.c[2] * r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
-		d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * r.c[3] - i.c[3] * i.c[3];
+		d2 = r.c[3] * i.c[3] + i.c[3] * r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -4495,49 +4601,49 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+			d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+			d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
-			d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+			d1 = r.c[2] * r.c[2] - i.c[2] * i.c[2];
+			d2 = r.c[2] * i.c[2] + i.c[2] * r.c[2];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
-			d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+			d1 = r.c[3] * r.c[3] - i.c[3] * i.c[3];
+			d2 = r.c[3] * i.c[3] + i.c[3] * r.c[3];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline Array4Complex64 *divide(const Complex64 a) {
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -4545,49 +4651,49 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline Array4Complex64 *divide(const Array4Complex64 &a) {
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -4595,144 +4701,144 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.i.c[0] + i.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[0] * a.i.c[0] - r.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-			d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+			d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-			d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+			d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline Array4Complex64 operator/(const Complex64 &a) const {
 		Array4Complex64 ret;
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[2] = d1;
-		ret.c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[3] = d1;
-		ret.c.c[3] = d2;
+		ret.i.c[3] = d2;
 		return ret;
 	}
 
 	inline Array4Complex64 operator/(const Array4Complex64 &a) const {
 		Array4Complex64 ret;
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		ret.i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		ret.r.c[2] = d1;
-		ret.c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		ret.i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		ret.r.c[3] = d1;
-		ret.c.c[3] = d2;
+		ret.i.c[3] = d2;
 		return ret;
 	}
 
 	inline void operator/=(const Complex64 &a) {
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 	}
 
 	inline void operator/=(const Array4Complex64 &a) {
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 	}
 
 	inline Array4Complex64 *sqrt() {
 		double d1;
 		double d2;
-		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[0]);
 		} else LIKELY {
-			d1 = c.c[0] / (2 * d2);
+			d1 = i.c[0] / (2 * d2);
 		}
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		i.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[1]);
 		} else LIKELY {
-			d1 = c.c[1] / (2 * d2);
+			d1 = i.c[1] / (2 * d2);
 		}
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+		i.c[1] = d2;
+		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[2]);
 		} else LIKELY {
-			d1 = c.c[2] / (2 * d2);
+			d1 = i.c[2] / (2 * d2);
 		}
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+		i.c[2] = d2;
+		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[3]);
 		} else LIKELY {
-			d1 = c.c[3] / (2 * d2);
+			d1 = i.c[3] / (2 * d2);
 		}
 		return this;
 	}
@@ -4741,44 +4847,44 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[0]);
 			} else LIKELY {
-				d1 = c.c[0] / (2 * d2);
+				d1 = i.c[0] / (2 * d2);
 			}
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[1]);
 			} else LIKELY {
-				d1 = c.c[1] / (2 * d2);
+				d1 = i.c[1] / (2 * d2);
 			}
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[2]);
 			} else LIKELY {
-				d1 = c.c[2] / (2 * d2);
+				d1 = i.c[2] / (2 * d2);
 			}
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[3]);
 			} else LIKELY {
-				d1 = c.c[3] / (2 * d2);
+				d1 = i.c[3] / (2 * d2);
 			}
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -4786,66 +4892,66 @@ public:
 	inline Array4Complex64 *sin() {
 		double d1;
 		double d2;
-		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+		d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+		d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
-		d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+		i.c[1] = d2;
+		d1 = ::sin(r.c[2]) * ::cosh(i.c[2]);
+		d2 = ::cos(i.c[2]) * ::sinh(r.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
-		d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+		i.c[2] = d2;
+		d1 = ::sin(r.c[3]) * ::cosh(i.c[3]);
+		d2 = ::cos(i.c[3]) * ::sinh(r.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
 	inline Array4Complex64 *cos() {
 		double d1;
 		double d2;
-		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+		d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+		d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
-		d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+		i.c[1] = d2;
+		d1 = ::cos(r.c[2]) * ::cosh(i.c[2]);
+		d2 = -::sin(i.c[2]) * ::sinh(r.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
-		d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+		i.c[2] = d2;
+		d1 = ::cos(r.c[3]) * ::cosh(i.c[3]);
+		d2 = -::sin(i.c[3]) * ::sinh(r.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
 	inline Array4Complex64 *tan() {
 		double d1;
 		double d2;
-		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+		d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+		d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
-		d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		i.c[1] = d2;
+		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
+		d2 = ::sinh(i.c[2] + i.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
-		d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		i.c[2] = d2;
+		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
+		d2 = ::sinh(i.c[3] + i.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -4853,28 +4959,28 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+			d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+			d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
-			d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+			d1 = ::sin(r.c[2]) * ::cosh(i.c[2]);
+			d2 = ::cos(i.c[2]) * ::sinh(r.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
-			d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+			d1 = ::sin(r.c[3]) * ::cosh(i.c[3]);
+			d2 = ::cos(i.c[3]) * ::sinh(r.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -4883,28 +4989,28 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+			d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+			d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
-			d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+			d1 = ::cos(r.c[2]) * ::cosh(i.c[2]);
+			d2 = -::sin(i.c[2]) * ::sinh(r.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
-			d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+			d1 = ::cos(r.c[3]) * ::cosh(i.c[3]);
+			d2 = -::sin(i.c[3]) * ::sinh(r.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -4913,70 +5019,70 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+			d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+			d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
-			d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
+			d2 = ::sinh(i.c[2] + i.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
-			d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
+			d2 = ::sinh(i.c[3] + i.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 
 	inline Array4Complex64 *exp() {
-		double d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-		double d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		double d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+		double d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		i.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
-		d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+		i.c[1] = d2;
+		d1 = ::exp(r.c[2]) * ::cos(i.c[2]);
+		d2 = ::exp(r.c[2]) * ::sin(i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
-		d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+		i.c[2] = d2;
+		d1 = ::exp(r.c[3]) * ::cos(i.c[3]);
+		d2 = ::exp(r.c[3]) * ::sin(i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
 	inline Array4Complex64 *exp(double n) {
-		double d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-		double d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		double d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+		double d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		i.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
-		d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+		i.c[1] = d2;
+		d1 = ::pow(n, r.c[2]) * ::cos(i.c[2] * ::log(n));
+		d2 = ::pow(n, r.c[2]) * ::sin(i.c[2] * ::log(n));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
-		d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+		i.c[2] = d2;
+		d1 = ::pow(n, r.c[3]) * ::cos(i.c[3] * ::log(n));
+		d2 = ::pow(n, r.c[3]) * ::sin(i.c[3] * ::log(n));
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -4984,101 +5090,101 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
-			d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+			d1 = ::exp(r.c[2]) * ::cos(i.c[2]);
+			d2 = ::exp(r.c[2]) * ::sin(i.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
-			d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+			d1 = ::exp(r.c[3]) * ::cos(i.c[3]);
+			d2 = ::exp(r.c[3]) * ::sin(i.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline Array4Complex64 *pow(Array4Complex64 n) {
-		double d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		double d2 = ::atan2(r.c[0], c.c[0]);
-		double d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-		double d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		double d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		double d2 = ::atan2(r.c[0], i.c[0]);
+		double d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+		double d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 		double d5 = d3 * ::cos(d4);
 		double d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
-		d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		d3 = ::exp(d1 * n.i.c[2] - d2 * n.r.c[2]);
+		d4 = d1 * n.r.c[2] + d2 * n.i.c[2];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[2] = d5;
+		i.c[2] = d5;
 		r.c[2] = d6;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
-		d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		d3 = ::exp(d1 * n.i.c[3] - d2 * n.r.c[3]);
+		d4 = d1 * n.r.c[3] + d2 * n.i.c[3];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[3] = d5;
+		i.c[3] = d5;
 		r.c[3] = d6;
 		return this;
 	}
 
 
 	inline Array4Complex64 *pow(Complex64 n) {
-		double d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		double d2 = ::atan2(r.c[0], c.c[0]);
+		double d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		double d2 = ::atan2(r.c[0], i.c[0]);
 		double d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		double d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		double d5 = d3 * ::cos(d4);
 		double d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[2] = d5;
+		i.c[2] = d5;
 		r.c[2] = d6;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[3] = d5;
+		i.c[3] = d5;
 		r.c[3] = d6;
 		return this;
 	}
@@ -5091,43 +5197,43 @@ public:
 		double d5;
 		double d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
-			d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			d3 = ::exp(d1 * n.i.c[2] - d2 * n.r.c[2]);
+			d4 = d1 * n.r.c[2] + d2 * n.i.c[2];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[2] = d5;
+			i.c[2] = d5;
 			r.c[2] = d6;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
-			d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			d3 = ::exp(d1 * n.i.c[3] - d2 * n.r.c[3]);
+			d4 = d1 * n.r.c[3] + d2 * n.i.c[3];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[3] = d5;
+			i.c[3] = d5;
 			r.c[3] = d6;
 		}
 		return this;
@@ -5142,43 +5248,43 @@ public:
 		double d5;
 		double d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[2] = d5;
+			i.c[2] = d5;
 			r.c[2] = d6;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[3] = d5;
+			i.c[3] = d5;
 			r.c[3] = d6;
 		}
 		return this;
@@ -5188,28 +5294,28 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
-			d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+			d1 = ::pow(n, r.c[2]) * ::cos(i.c[2] * ::log(n));
+			d2 = ::pow(n, r.c[2]) * ::sin(i.c[2] * ::log(n));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
-			d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+			d1 = ::pow(n, r.c[3]) * ::cos(i.c[3] * ::log(n));
+			d2 = ::pow(n, r.c[3]) * ::sin(i.c[3] * ::log(n));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -5217,22 +5323,22 @@ public:
 	inline Array4Complex64 *pow(double n) {
 		double d1;
 		double d2;
-		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		i.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
-		d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+		i.c[1] = d2;
+		d1 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::cos(n * atan2(i.c[2], r.c[2]));
+		d2 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::sin(n * atan2(i.c[2], r.c[2]));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
-		d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+		i.c[2] = d2;
+		d1 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::cos(n * atan2(i.c[3], r.c[3]));
+		d2 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::sin(n * atan2(i.c[3], r.c[3]));
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 
 		return this;
 	}
@@ -5241,65 +5347,65 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
-			d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+			d1 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::cos(n * atan2(i.c[2], r.c[2]));
+			d2 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::sin(n * atan2(i.c[2], r.c[2]));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
-			d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+			d1 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::cos(n * atan2(i.c[3], r.c[3]));
+			d2 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::sin(n * atan2(i.c[3], r.c[3]));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline VectorDouble4D abs() {
 		VectorDouble4D ret;
-		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
-		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
-		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2]);
-		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3]);
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1]);
+		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2]);
+		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3]);
 		return ret;
 	}
 
 	inline VectorU8_4D abs_gt(double a) {
 		VectorU8_4D ret;
-		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a < r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a < r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a < r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a < r.c[3] * r.c[3] + i.c[3] * i.c[3];
 		return ret;
 	}
 
 	inline VectorU8_4D abs_lt(double a) {
 		VectorU8_4D ret;
-		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a > r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a > r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a > r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a > r.c[3] * r.c[3] + i.c[3] * i.c[3];
 		return ret;
 	}
 
 	inline VectorU8_4D abs_eq(double a) {
 		VectorU8_4D ret;
-		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a == r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a == r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a == r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a == r.c[3] * r.c[3] + i.c[3] * i.c[3];
 		return ret;
 	}
 
@@ -5307,27 +5413,27 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		return this;
@@ -5337,27 +5443,27 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		return this;
@@ -5367,27 +5473,27 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[2], i.c[2]) / AML_LN10;
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[3], i.c[3]) / AML_LN10;
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		return this;
@@ -5396,21 +5502,21 @@ public:
 	inline Array4Complex64 *ln() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		i.c[3] = d1;
 		r.c[3] = d2;
 		return this;
 	}
@@ -5418,21 +5524,21 @@ public:
 	inline Array4Complex64 *log() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		i.c[3] = d1;
 		r.c[3] = d2;
 		return this;
 	}
@@ -5440,37 +5546,73 @@ public:
 	inline Array4Complex64 *log10() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[2], i.c[2]) / AML_LN10;
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[3], i.c[3]) / AML_LN10;
+		i.c[3] = d1;
 		r.c[3] = d2;
 		return this;
+	}
+
+	class Complex64_4_Itr : public std::iterator<
+			std::input_iterator_tag,   // iterator_category
+			Complex64Ptr,                      // value_type
+			long,                      // difference_type
+			const Complex64Ptr *,               // pointer
+			Complex64Ptr                       // reference
+	> {
+
+		Array4Complex64 *a;
+		int position;
+
+	public:
+		inline explicit Complex64_4_Itr(Array4Complex64 *array, int length) : a(array), position(length) {}
+
+		inline Complex64_4_Itr &operator++() {
+			position++;
+			return *this;
+		}
+
+		inline bool operator==(Complex64_4_Itr other) const { return position == other.position; }
+
+		inline bool operator!=(Complex64_4_Itr other) const { return !(*this == other); }
+
+		inline reference operator*() const { return Complex64Ptr(&a->r.c[position], &a->i.c[position], position); }
+
+
+	};
+
+	inline Complex64_4_Itr begin() {
+		return Complex64_4_Itr(this, 0);
+	}
+
+	inline Complex64_4_Itr end() {
+		return Complex64_4_Itr(this, 4);
 	}
 };
 
 inline std::string operator<<(std::string &lhs, const Array4Complex64 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i }";
 	return string.str();
 }
 
 inline std::string operator<<(const char *lhs, const Array4Complex64 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i }";
 	return string.str();
 }
 
@@ -5481,8 +5623,8 @@ operator<<(std::basic_ostream<charT, traits> &o, const Array4Complex64 &rhs) {
 	s.flags(o.flags());
 	s.imbue(o.getloc());
 	s.precision(o.precision());
-	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-	  << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	s << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+	  << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i }";
 	return o << s.str();
 }
 
@@ -5492,10 +5634,10 @@ inline Array4Complex64 operator+(const Complex64 &lhs, const Array4Complex64 &rh
 
 inline Array4Complex64 operator-(const Complex64 &lhs, const Array4Complex64 &rhs) {
 	Array4Complex64 ret;
-	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
-	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
-	ret.c.c[2] = lhs.c.c[1] - rhs.c.c[2];
-	ret.c.c[3] = lhs.c.c[1] - rhs.c.c[3];
+	ret.i.c[0] = lhs.c.c[1] - rhs.i.c[0];
+	ret.i.c[1] = lhs.c.c[1] - rhs.i.c[1];
+	ret.i.c[2] = lhs.c.c[1] - rhs.i.c[2];
+	ret.i.c[3] = lhs.c.c[1] - rhs.i.c[3];
 	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
 	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
 	ret.r.c[2] = lhs.c.c[0] - rhs.r.c[2];
@@ -5510,50 +5652,50 @@ inline Array4Complex64 operator*(const Complex64 &lhs, const Array4Complex64 &rh
 inline Array4Complex64 operator/(const Complex64 &lhs, const Array4Complex64 &rhs) {
 	Array4Complex64 ret;
 	double d1 =
-			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	double d2 =
-			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	ret.r.c[0] = d1;
-	ret.c.c[0] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
-	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.i.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
 	ret.r.c[1] = d1;
-	ret.c.c[1] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
-	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	ret.i.c[1] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.i.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.i.c[2] * rhs.i.c[2]);
+	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.i.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.i.c[2] * rhs.i.c[2]);
 	ret.r.c[2] = d1;
-	ret.c.c[2] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
-	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	ret.i.c[2] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.i.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.i.c[3] * rhs.i.c[3]);
+	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.i.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.i.c[3] * rhs.i.c[3]);
 	ret.r.c[3] = d1;
-	ret.c.c[3] = d2;
+	ret.i.c[3] = d2;
 	return ret;
 }
 
 class Array8Complex64 {
 public:
 	doublevec8 r{};
-	doublevec8 c{};
+	doublevec8 i{};
 
 	inline Array8Complex64() {}
 
 	inline Array8Complex64(Complex64 value) {
 		r.c[0] = value.c.c[0];
-		c.c[0] = value.c.c[1];
+		i.c[0] = value.c.c[1];
 		r.c[1] = value.c.c[0];
-		c.c[1] = value.c.c[1];
+		i.c[1] = value.c.c[1];
 		r.c[2] = value.c.c[0];
-		c.c[2] = value.c.c[1];
+		i.c[2] = value.c.c[1];
 		r.c[3] = value.c.c[0];
-		c.c[3] = value.c.c[1];
+		i.c[3] = value.c.c[1];
 		r.c[4] = value.c.c[0];
-		c.c[4] = value.c.c[1];
+		i.c[4] = value.c.c[1];
 		r.c[5] = value.c.c[0];
-		c.c[5] = value.c.c[1];
+		i.c[5] = value.c.c[1];
 		r.c[6] = value.c.c[0];
-		c.c[6] = value.c.c[1];
+		i.c[6] = value.c.c[1];
 		r.c[7] = value.c.c[0];
-		c.c[7] = value.c.c[1];
+		i.c[7] = value.c.c[1];
 	}
 
 	inline VectorDouble8D real() {
@@ -5561,27 +5703,25 @@ public:
 	}
 
 	inline VectorDouble8D complex() {
-		return VectorDouble8D(c.c);
+		return VectorDouble8D(i.c);
 	}
 
 	inline Complex64 operator[](uint64_t location) {
-		return Complex64(r.c[location], c.c[location]);
+		return Complex64(r.c[location], i.c[location]);
 	}
 
 	inline void set(uint64_t location, Complex64 value) {
 		r.c[location] = value.c.c[0];
-		c.c[location] = value.c.c[1];
+		i.c[location] = value.c.c[1];
 	}
 
-	inline Array8Complex64 *add(Array8Complex64 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[2];
-		c.c[3] += a.c.c[3];
-		c.c[4] += a.c.c[4];
-		c.c[5] += a.c.c[5];
-		c.c[6] += a.c.c[6];
-		c.c[7] += a.c.c[7];
+	inline Array8Complex64 *add(const Array8Complex64 &a) {
+#if defined(USE_AVX)
+		i.avx[0] = _mm256_add_pd(i.avx[0], a.i.avx[0]);
+		i.avx[1] = _mm256_add_pd(i.avx[1], a.i.avx[1]);
+		r.avx[0] = _mm256_add_pd(r.avx[0], a.r.avx[0]);
+		r.avx[1] = _mm256_add_pd(r.avx[1], a.r.avx[1]);
+#else
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
@@ -5590,18 +5730,35 @@ public:
 		r.c[5] += a.r.c[5];
 		r.c[6] += a.r.c[6];
 		r.c[7] += a.r.c[7];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
+		i.c[2] += a.i.c[2];
+		i.c[3] += a.i.c[3];
+		i.c[4] += a.i.c[4];
+		i.c[5] += a.i.c[5];
+		i.c[6] += a.i.c[6];
+		i.c[7] += a.i.c[7];
+#endif
 		return this;
 	}
 
-	inline Array8Complex64 *add(Complex64 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[1];
-		c.c[3] += a.c.c[1];
-		c.c[4] += a.c.c[1];
-		c.c[5] += a.c.c[1];
-		c.c[6] += a.c.c[1];
-		c.c[7] += a.c.c[1];
+	inline Array8Complex64 *add(const Complex64 &a) {
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		i.avx[0] = _mm256_add_pd(i.avx[0], a_i);
+		i.avx[1] = _mm256_add_pd(i.avx[1], a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		r.avx[0] = _mm256_add_pd(r.avx[0], a_r);
+		r.avx[1] = _mm256_add_pd(r.avx[1], a_r);
+#else
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
+		i.c[2] += a.c.c[1];
+		i.c[3] += a.c.c[1];
+		i.c[4] += a.c.c[1];
+		i.c[5] += a.c.c[1];
+		i.c[6] += a.c.c[1];
+		i.c[7] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
@@ -5610,19 +5767,25 @@ public:
 		r.c[5] += a.c.c[0];
 		r.c[6] += a.c.c[0];
 		r.c[7] += a.c.c[0];
+#endif
 		return this;
 	}
 
-
 	inline void operator+=(Array8Complex64 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[2];
-		c.c[3] += a.c.c[3];
-		c.c[4] += a.c.c[4];
-		c.c[5] += a.c.c[5];
-		c.c[6] += a.c.c[6];
-		c.c[7] += a.c.c[7];
+#if defined(USE_AVX)
+		i.avx[0] = _mm256_add_pd(i.avx[0], a.i.avx[0]);
+		i.avx[1] = _mm256_add_pd(i.avx[1], a.i.avx[1]);
+		r.avx[0] = _mm256_add_pd(r.avx[0], a.r.avx[0]);
+		r.avx[1] = _mm256_add_pd(r.avx[1], a.r.avx[1]);
+#else
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
+		i.c[2] += a.i.c[2];
+		i.c[3] += a.i.c[3];
+		i.c[4] += a.i.c[4];
+		i.c[5] += a.i.c[5];
+		i.c[6] += a.i.c[6];
+		i.c[7] += a.i.c[7];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
@@ -5631,17 +5794,26 @@ public:
 		r.c[5] += a.r.c[5];
 		r.c[6] += a.r.c[6];
 		r.c[7] += a.r.c[7];
+#endif
 	}
 
 	inline void operator+=(Complex64 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[1];
-		c.c[3] += a.c.c[1];
-		c.c[4] += a.c.c[1];
-		c.c[5] += a.c.c[1];
-		c.c[6] += a.c.c[1];
-		c.c[7] += a.c.c[1];
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		i.avx[0] = _mm256_add_pd(i.avx[0], a_i);
+		i.avx[1] = _mm256_add_pd(i.avx[1], a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		r.avx[0] = _mm256_add_pd(r.avx[0], a_r);
+		r.avx[1] = _mm256_add_pd(r.avx[1], a_r);
+#else
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
+		i.c[2] += a.c.c[1];
+		i.c[3] += a.c.c[1];
+		i.c[4] += a.c.c[1];
+		i.c[5] += a.c.c[1];
+		i.c[6] += a.c.c[1];
+		i.c[7] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
@@ -5650,18 +5822,17 @@ public:
 		r.c[5] += a.c.c[0];
 		r.c[6] += a.c.c[0];
 		r.c[7] += a.c.c[0];
+#endif
 	}
 
 	inline Array8Complex64 operator+(Array8Complex64 a) const {
 		Array8Complex64 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[0];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.c.c[2] = c.c[2] + a.c.c[2];
-		ret.c.c[3] = c.c[3] + a.c.c[3];
-		ret.c.c[4] = c.c[4] + a.c.c[4];
-		ret.c.c[5] = c.c[5] + a.c.c[5];
-		ret.c.c[6] = c.c[6] + a.c.c[6];
-		ret.c.c[7] = c.c[7] + a.c.c[7];
+#if defined(USE_AVX)
+		ret.i.avx[0] = _mm256_add_pd(i.avx[0], a.i.avx[0]);
+		ret.i.avx[1] = _mm256_add_pd(i.avx[1], a.i.avx[1]);
+		ret.r.avx[0] = _mm256_add_pd(r.avx[0], a.r.avx[0]);
+		ret.r.avx[1] = _mm256_add_pd(r.avx[1], a.r.avx[1]);
+#else
 		ret.r.c[0] = r.c[0] + a.r.c[0];
 		ret.r.c[1] = r.c[1] + a.r.c[1];
 		ret.r.c[2] = r.c[2] + a.r.c[2];
@@ -5670,19 +5841,36 @@ public:
 		ret.r.c[5] = r.c[5] + a.r.c[5];
 		ret.r.c[6] = r.c[6] + a.r.c[6];
 		ret.r.c[7] = r.c[7] + a.r.c[7];
+		ret.i.c[0] = i.c[0] + a.i.c[0];
+		ret.i.c[1] = i.c[1] + a.i.c[1];
+		ret.i.c[2] = i.c[2] + a.i.c[2];
+		ret.i.c[3] = i.c[3] + a.i.c[3];
+		ret.i.c[4] = i.c[4] + a.i.c[4];
+		ret.i.c[5] = i.c[5] + a.i.c[5];
+		ret.i.c[6] = i.c[6] + a.i.c[6];
+		ret.i.c[7] = i.c[7] + a.i.c[7];
+#endif
 		return ret;
 	}
 
 	inline Array8Complex64 operator+(Complex64 a) const {
 		Array8Complex64 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[1];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.c.c[2] = c.c[2] + a.c.c[1];
-		ret.c.c[3] = c.c[3] + a.c.c[1];
-		ret.c.c[4] = c.c[4] + a.c.c[1];
-		ret.c.c[5] = c.c[5] + a.c.c[1];
-		ret.c.c[6] = c.c[6] + a.c.c[1];
-		ret.c.c[7] = c.c[7] + a.c.c[1];
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		ret.i.avx[0] = _mm256_add_pd(i.avx[0], a_i);
+		ret.i.avx[1] = _mm256_add_pd(i.avx[1], a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		ret.r.avx[0] = _mm256_add_pd(r.avx[0], a_r);
+		ret.r.avx[1] = _mm256_add_pd(r.avx[1], a_r);
+#else
+		ret.i.c[0] = i.c[0] + a.c.c[1];
+		ret.i.c[1] = i.c[1] + a.c.c[1];
+		ret.i.c[2] = i.c[2] + a.c.c[1];
+		ret.i.c[3] = i.c[3] + a.c.c[1];
+		ret.i.c[4] = i.c[4] + a.c.c[1];
+		ret.i.c[5] = i.c[5] + a.c.c[1];
+		ret.i.c[6] = i.c[6] + a.c.c[1];
+		ret.i.c[7] = i.c[7] + a.c.c[1];
 		ret.r.c[0] = r.c[0] + a.c.c[0];
 		ret.r.c[1] = r.c[1] + a.c.c[0];
 		ret.r.c[2] = r.c[2] + a.c.c[0];
@@ -5691,40 +5879,41 @@ public:
 		ret.r.c[5] = r.c[5] + a.c.c[0];
 		ret.r.c[6] = r.c[6] + a.c.c[0];
 		ret.r.c[7] = r.c[7] + a.c.c[0];
+#endif
 		return ret;
 	}
 
 	inline Array8Complex64 *add(Array8Complex64 a, VectorU8_8D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[0];
+			i.c[0] += a.i.c[0];
 			r.c[0] += a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.i.c[1];
 			r.c[1] += a.r.c[1];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] += a.c.c[2];
+			i.c[2] += a.i.c[2];
 			r.c[2] += a.r.c[2];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] += a.c.c[3];
+			i.c[3] += a.i.c[3];
 			r.c[3] += a.r.c[3];
 		}
 		if (mask.v.c[4]) {
-			c.c[4] += a.c.c[4];
+			i.c[4] += a.i.c[4];
 			r.c[4] += a.r.c[4];
 		}
 		if (mask.v.c[5]) {
-			c.c[5] += a.c.c[5];
+			i.c[5] += a.i.c[5];
 			r.c[5] += a.r.c[5];
 		}
 		if (mask.v.c[6]) {
-			c.c[6] += a.c.c[6];
+			i.c[6] += a.i.c[6];
 			r.c[6] += a.r.c[6];
 		}
 		if (mask.v.c[7]) {
-			c.c[7] += a.c.c[7];
+			i.c[7] += a.i.c[7];
 			r.c[7] += a.r.c[7];
 		}
 		return this;
@@ -5732,49 +5921,49 @@ public:
 
 	inline Array8Complex64 *add(Complex64 a, VectorU8_8D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[1];
+			i.c[0] += a.c.c[1];
 			r.c[0] += a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.c.c[1];
 			r.c[1] += a.c.c[0];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] += a.c.c[1];
+			i.c[2] += a.c.c[1];
 			r.c[2] += a.c.c[0];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] += a.c.c[1];
+			i.c[3] += a.c.c[1];
 			r.c[3] += a.c.c[0];
 		}
 		if (mask.v.c[4]) {
-			c.c[4] += a.c.c[1];
+			i.c[4] += a.c.c[1];
 			r.c[4] += a.c.c[0];
 		}
 		if (mask.v.c[5]) {
-			c.c[5] += a.c.c[1];
+			i.c[5] += a.c.c[1];
 			r.c[5] += a.c.c[0];
 		}
 		if (mask.v.c[6]) {
-			c.c[6] += a.c.c[1];
+			i.c[6] += a.c.c[1];
 			r.c[6] += a.c.c[0];
 		}
 		if (mask.v.c[7]) {
-			c.c[7] += a.c.c[1];
+			i.c[7] += a.c.c[1];
 			r.c[7] += a.c.c[0];
 		}
 		return this;
 	}
 
 	inline Array8Complex64 *subtract(Array8Complex64 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[2];
-		c.c[3] -= a.c.c[3];
-		c.c[4] -= a.c.c[4];
-		c.c[5] -= a.c.c[5];
-		c.c[6] -= a.c.c[6];
-		c.c[7] -= a.c.c[7];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
+		i.c[2] -= a.i.c[2];
+		i.c[3] -= a.i.c[3];
+		i.c[4] -= a.i.c[4];
+		i.c[5] -= a.i.c[5];
+		i.c[6] -= a.i.c[6];
+		i.c[7] -= a.i.c[7];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
@@ -5787,14 +5976,14 @@ public:
 	}
 
 	inline Array8Complex64 *subtract(Complex64 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[1];
-		c.c[3] -= a.c.c[1];
-		c.c[4] -= a.c.c[1];
-		c.c[5] -= a.c.c[1];
-		c.c[6] -= a.c.c[1];
-		c.c[7] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
+		i.c[2] -= a.c.c[1];
+		i.c[3] -= a.c.c[1];
+		i.c[4] -= a.c.c[1];
+		i.c[5] -= a.c.c[1];
+		i.c[6] -= a.c.c[1];
+		i.c[7] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
@@ -5807,14 +5996,14 @@ public:
 	}
 
 	inline void operator-=(Array8Complex64 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[2];
-		c.c[3] -= a.c.c[3];
-		c.c[4] -= a.c.c[4];
-		c.c[5] -= a.c.c[5];
-		c.c[6] -= a.c.c[6];
-		c.c[7] -= a.c.c[7];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
+		i.c[2] -= a.i.c[2];
+		i.c[3] -= a.i.c[3];
+		i.c[4] -= a.i.c[4];
+		i.c[5] -= a.i.c[5];
+		i.c[6] -= a.i.c[6];
+		i.c[7] -= a.i.c[7];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
@@ -5826,14 +6015,14 @@ public:
 	}
 
 	inline void operator-=(Complex64 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[1];
-		c.c[3] -= a.c.c[1];
-		c.c[4] -= a.c.c[1];
-		c.c[5] -= a.c.c[1];
-		c.c[6] -= a.c.c[1];
-		c.c[7] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
+		i.c[2] -= a.c.c[1];
+		i.c[3] -= a.c.c[1];
+		i.c[4] -= a.c.c[1];
+		i.c[5] -= a.c.c[1];
+		i.c[6] -= a.c.c[1];
+		i.c[7] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
@@ -5846,14 +6035,14 @@ public:
 
 	inline Array8Complex64 operator-(Array8Complex64 a) const {
 		Array8Complex64 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[0];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
-		ret.c.c[2] = c.c[2] - a.c.c[2];
-		ret.c.c[3] = c.c[3] - a.c.c[3];
-		ret.c.c[4] = c.c[4] - a.c.c[4];
-		ret.c.c[5] = c.c[5] - a.c.c[5];
-		ret.c.c[6] = c.c[6] - a.c.c[6];
-		ret.c.c[7] = c.c[7] - a.c.c[7];
+		ret.i.c[0] = i.c[0] - a.i.c[0];
+		ret.i.c[1] = i.c[1] - a.i.c[1];
+		ret.i.c[2] = i.c[2] - a.i.c[2];
+		ret.i.c[3] = i.c[3] - a.i.c[3];
+		ret.i.c[4] = i.c[4] - a.i.c[4];
+		ret.i.c[5] = i.c[5] - a.i.c[5];
+		ret.i.c[6] = i.c[6] - a.i.c[6];
+		ret.i.c[7] = i.c[7] - a.i.c[7];
 		ret.r.c[0] = r.c[0] - a.r.c[0];
 		ret.r.c[1] = r.c[1] - a.r.c[1];
 		ret.r.c[2] = r.c[2] - a.r.c[2];
@@ -5867,14 +6056,14 @@ public:
 
 	inline Array8Complex64 operator-(Complex64 a) const {
 		Array8Complex64 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[1];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
-		ret.c.c[2] = c.c[2] - a.c.c[1];
-		ret.c.c[3] = c.c[3] - a.c.c[1];
-		ret.c.c[4] = c.c[4] - a.c.c[1];
-		ret.c.c[5] = c.c[5] - a.c.c[1];
-		ret.c.c[6] = c.c[6] - a.c.c[1];
-		ret.c.c[7] = c.c[7] - a.c.c[1];
+		ret.i.c[0] = i.c[0] - a.c.c[1];
+		ret.i.c[1] = i.c[1] - a.c.c[1];
+		ret.i.c[2] = i.c[2] - a.c.c[1];
+		ret.i.c[3] = i.c[3] - a.c.c[1];
+		ret.i.c[4] = i.c[4] - a.c.c[1];
+		ret.i.c[5] = i.c[5] - a.c.c[1];
+		ret.i.c[6] = i.c[6] - a.c.c[1];
+		ret.i.c[7] = i.c[7] - a.c.c[1];
 		ret.r.c[0] = r.c[0] - a.c.c[0];
 		ret.r.c[1] = r.c[1] - a.c.c[0];
 		ret.r.c[2] = r.c[2] - a.c.c[0];
@@ -5888,35 +6077,35 @@ public:
 
 	inline Array8Complex64 *subtract(Array8Complex64 a, VectorU8_8D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[0];
+			i.c[0] -= a.i.c[0];
 			r.c[0] -= a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.i.c[1];
 			r.c[1] -= a.r.c[1];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] -= a.c.c[2];
+			i.c[2] -= a.i.c[2];
 			r.c[2] -= a.r.c[2];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] -= a.c.c[3];
+			i.c[3] -= a.i.c[3];
 			r.c[3] -= a.r.c[3];
 		}
 		if (mask.v.c[4]) {
-			c.c[4] -= a.c.c[4];
+			i.c[4] -= a.i.c[4];
 			r.c[4] -= a.r.c[4];
 		}
 		if (mask.v.c[5]) {
-			c.c[5] -= a.c.c[5];
+			i.c[5] -= a.i.c[5];
 			r.c[5] -= a.r.c[5];
 		}
 		if (mask.v.c[6]) {
-			c.c[6] -= a.c.c[6];
+			i.c[6] -= a.i.c[6];
 			r.c[6] -= a.r.c[6];
 		}
 		if (mask.v.c[7]) {
-			c.c[7] -= a.c.c[7];
+			i.c[7] -= a.i.c[7];
 			r.c[7] -= a.r.c[7];
 		}
 		return this;
@@ -5924,35 +6113,35 @@ public:
 
 	inline Array8Complex64 *subtract(Complex64 a, VectorU8_8D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[1];
+			i.c[0] -= a.c.c[1];
 			r.c[0] -= a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.c.c[1];
 			r.c[1] -= a.c.c[0];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] -= a.c.c[1];
+			i.c[2] -= a.c.c[1];
 			r.c[2] -= a.c.c[0];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] -= a.c.c[1];
+			i.c[3] -= a.c.c[1];
 			r.c[3] -= a.c.c[0];
 		}
 		if (mask.v.c[4]) {
-			c.c[4] -= a.c.c[1];
+			i.c[4] -= a.c.c[1];
 			r.c[4] -= a.c.c[0];
 		}
 		if (mask.v.c[5]) {
-			c.c[5] -= a.c.c[1];
+			i.c[5] -= a.c.c[1];
 			r.c[5] -= a.c.c[0];
 		}
 		if (mask.v.c[6]) {
-			c.c[6] -= a.c.c[1];
+			i.c[6] -= a.c.c[1];
 			r.c[6] -= a.c.c[0];
 		}
 		if (mask.v.c[7]) {
-			c.c[7] -= a.c.c[1];
+			i.c[7] -= a.c.c[1];
 			r.c[7] -= a.c.c[0];
 		}
 		return this;
@@ -5961,22 +6150,22 @@ public:
 
 	inline Array8Complex64 operator*(const Array8Complex64 &a) const {
 		Array8Complex64 ret;
-		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
-		ret.r.c[2] = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		ret.c.c[2] = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
-		ret.r.c[3] = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		ret.c.c[3] = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
-		ret.r.c[4] = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
-		ret.c.c[4] = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
-		ret.r.c[5] = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
-		ret.c.c[5] = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
-		ret.r.c[6] = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
-		ret.c.c[6] = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
-		ret.r.c[7] = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
-		ret.c.c[7] = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		ret.r.c[0] = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		ret.i.c[0] = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		ret.i.c[1] = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
+		ret.r.c[2] = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		ret.i.c[2] = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
+		ret.r.c[3] = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		ret.i.c[3] = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
+		ret.r.c[4] = r.c[4] * a.r.c[4] - i.c[4] * a.i.c[4];
+		ret.i.c[4] = r.c[4] * a.i.c[4] + i.c[4] * a.r.c[4];
+		ret.r.c[5] = r.c[5] * a.r.c[5] - i.c[5] * a.i.c[5];
+		ret.i.c[5] = r.c[5] * a.i.c[5] + i.c[5] * a.r.c[5];
+		ret.r.c[6] = r.c[6] * a.r.c[6] - i.c[6] * a.i.c[6];
+		ret.i.c[6] = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
+		ret.r.c[7] = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
+		ret.i.c[7] = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
 
 
 		return ret;
@@ -5985,135 +6174,135 @@ public:
 	inline Array8Complex64 *multiply(const Array8Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
-		d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+		i.c[3] = d2;
+		d1 = r.c[4] * a.r.c[4] - i.c[4] * a.i.c[4];
+		d2 = r.c[4] * a.i.c[4] + i.c[4] * a.r.c[4];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
-		d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+		i.c[4] = d2;
+		d1 = r.c[5] * a.r.c[5] - i.c[5] * a.i.c[5];
+		d2 = r.c[5] * a.i.c[5] + i.c[5] * a.r.c[5];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
-		d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+		i.c[5] = d2;
+		d1 = r.c[6] * a.r.c[6] - i.c[6] * a.i.c[6];
+		d2 = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
-		d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		i.c[6] = d2;
+		d1 = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
+		d2 = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline void operator*=(const Array8Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
-		d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+		i.c[3] = d2;
+		d1 = r.c[4] * a.r.c[4] - i.c[4] * a.i.c[4];
+		d2 = r.c[4] * a.i.c[4] + i.c[4] * a.r.c[4];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
-		d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+		i.c[4] = d2;
+		d1 = r.c[5] * a.r.c[5] - i.c[5] * a.i.c[5];
+		d2 = r.c[5] * a.i.c[5] + i.c[5] * a.r.c[5];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
-		d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+		i.c[5] = d2;
+		d1 = r.c[6] * a.r.c[6] - i.c[6] * a.i.c[6];
+		d2 = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
-		d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		i.c[6] = d2;
+		d1 = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
+		d2 = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 	}
 
 	inline void operator*=(const Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
-		d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+		i.c[3] = d2;
+		d1 = r.c[4] * a.c.c[0] - i.c[4] * a.c.c[1];
+		d2 = r.c[4] * a.c.c[1] + i.c[4] * a.c.c[0];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
-		d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+		i.c[4] = d2;
+		d1 = r.c[5] * a.c.c[0] - i.c[5] * a.c.c[1];
+		d2 = r.c[5] * a.c.c[1] + i.c[5] * a.c.c[0];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
-		d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+		i.c[5] = d2;
+		d1 = r.c[6] * a.c.c[0] - i.c[6] * a.c.c[1];
+		d2 = r.c[6] * a.c.c[1] + i.c[6] * a.c.c[0];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
-		d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		i.c[6] = d2;
+		d1 = r.c[7] * a.c.c[0] - i.c[7] * a.c.c[1];
+		d2 = r.c[7] * a.c.c[1] + i.c[7] * a.c.c[0];
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 	}
 
 	inline Array8Complex64 operator*(const Complex64 &a) const {
 		Array8Complex64 ret;
-		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
-		ret.r.c[2] = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		ret.c.c[2] = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
-		ret.r.c[3] = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		ret.c.c[3] = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
-		ret.r.c[4] = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
-		ret.c.c[4] = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
-		ret.r.c[5] = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
-		ret.c.c[5] = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
-		ret.r.c[6] = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
-		ret.c.c[6] = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
-		ret.r.c[7] = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
-		ret.c.c[7] = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		ret.r.c[0] = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		ret.i.c[0] = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		ret.i.c[1] = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
+		ret.r.c[2] = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		ret.i.c[2] = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
+		ret.r.c[3] = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		ret.i.c[3] = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
+		ret.r.c[4] = r.c[4] * a.c.c[0] - i.c[4] * a.c.c[1];
+		ret.i.c[4] = r.c[4] * a.c.c[1] + i.c[4] * a.c.c[0];
+		ret.r.c[5] = r.c[5] * a.c.c[0] - i.c[5] * a.c.c[1];
+		ret.i.c[5] = r.c[5] * a.c.c[1] + i.c[5] * a.c.c[0];
+		ret.r.c[6] = r.c[6] * a.c.c[0] - i.c[6] * a.c.c[1];
+		ret.i.c[6] = r.c[6] * a.c.c[1] + i.c[6] * a.c.c[0];
+		ret.r.c[7] = r.c[7] * a.c.c[0] - i.c[7] * a.c.c[1];
+		ret.i.c[7] = r.c[7] * a.c.c[1] + i.c[7] * a.c.c[0];
 
 
 		return ret;
@@ -6122,38 +6311,38 @@ public:
 	inline Array8Complex64 *multiply(const Complex64 &a) {
 		double d1;
 		double d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
-		d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+		i.c[3] = d2;
+		d1 = r.c[4] * a.c.c[0] - i.c[4] * a.c.c[1];
+		d2 = r.c[4] * a.c.c[1] + i.c[4] * a.c.c[0];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
-		d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+		i.c[4] = d2;
+		d1 = r.c[5] * a.c.c[0] - i.c[5] * a.c.c[1];
+		d2 = r.c[5] * a.c.c[1] + i.c[5] * a.c.c[0];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
-		d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+		i.c[5] = d2;
+		d1 = r.c[6] * a.c.c[0] - i.c[6] * a.c.c[1];
+		d2 = r.c[6] * a.c.c[1] + i.c[6] * a.c.c[0];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
-		d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		i.c[6] = d2;
+		d1 = r.c[7] * a.c.c[0] - i.c[7] * a.c.c[1];
+		d2 = r.c[7] * a.c.c[1] + i.c[7] * a.c.c[0];
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -6161,52 +6350,52 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-			d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+			d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+			d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-			d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+			d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+			d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
-			d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+			d1 = r.c[4] * a.c.c[0] - i.c[4] * a.c.c[1];
+			d2 = r.c[4] * a.c.c[1] + i.c[4] * a.c.c[0];
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
-			d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+			d1 = r.c[5] * a.c.c[0] - i.c[5] * a.c.c[1];
+			d2 = r.c[5] * a.c.c[1] + i.c[5] * a.c.c[0];
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
-			d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+			d1 = r.c[6] * a.c.c[0] - i.c[6] * a.c.c[1];
+			d2 = r.c[6] * a.c.c[1] + i.c[6] * a.c.c[0];
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
-			d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+			d1 = r.c[7] * a.c.c[0] - i.c[7] * a.c.c[1];
+			d2 = r.c[7] * a.c.c[1] + i.c[7] * a.c.c[0];
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 
@@ -6217,52 +6406,52 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+			d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+			d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-			d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+			d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+			d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-			d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+			d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+			d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
-			d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+			d1 = r.c[4] * a.r.c[4] - i.c[4] * a.i.c[4];
+			d2 = r.c[4] * a.i.c[4] + i.c[4] * a.r.c[4];
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
-			d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+			d1 = r.c[5] * a.r.c[5] - i.c[5] * a.i.c[5];
+			d2 = r.c[5] * a.i.c[5] + i.c[5] * a.r.c[5];
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
-			d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+			d1 = r.c[6] * a.r.c[6] - i.c[6] * a.i.c[6];
+			d2 = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
-			d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+			d1 = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
+			d2 = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -6270,38 +6459,38 @@ public:
 	inline Array8Complex64 *square() {
 		double d1;
 		double d2;
-		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+		d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		i.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+		d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
-		d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * r.c[2] - i.c[2] * i.c[2];
+		d2 = r.c[2] * i.c[2] + i.c[2] * r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
-		d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * r.c[3] - i.c[3] * i.c[3];
+		d2 = r.c[3] * i.c[3] + i.c[3] * r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * r.c[4] - c.c[4] * c.c[4];
-		d2 = r.c[4] * c.c[4] + c.c[4] * r.c[4];
+		i.c[3] = d2;
+		d1 = r.c[4] * r.c[4] - i.c[4] * i.c[4];
+		d2 = r.c[4] * i.c[4] + i.c[4] * r.c[4];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * r.c[5] - c.c[5] * c.c[5];
-		d2 = r.c[5] * c.c[5] + c.c[5] * r.c[5];
+		i.c[4] = d2;
+		d1 = r.c[5] * r.c[5] - i.c[5] * i.c[5];
+		d2 = r.c[5] * i.c[5] + i.c[5] * r.c[5];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * r.c[6] - c.c[6] * c.c[6];
-		d2 = r.c[6] * c.c[6] + c.c[6] * r.c[6];
+		i.c[5] = d2;
+		d1 = r.c[6] * r.c[6] - i.c[6] * i.c[6];
+		d2 = r.c[6] * i.c[6] + i.c[6] * r.c[6];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
-		d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
+		i.c[6] = d2;
+		d1 = r.c[7] * r.c[7] - i.c[7] * i.c[7];
+		d2 = r.c[7] * i.c[7] + i.c[7] * r.c[7];
 		r.c[7] = d1;
-		c.c[7] =
+		i.c[7] =
 				d2;
 		return this;
 	}
@@ -6310,89 +6499,89 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+			d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+			d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
-			d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+			d1 = r.c[2] * r.c[2] - i.c[2] * i.c[2];
+			d2 = r.c[2] * i.c[2] + i.c[2] * r.c[2];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
-			d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+			d1 = r.c[3] * r.c[3] - i.c[3] * i.c[3];
+			d2 = r.c[3] * i.c[3] + i.c[3] * r.c[3];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = r.c[4] * r.c[4] - c.c[4] * c.c[4];
-			d2 = r.c[4] * c.c[4] + c.c[4] * r.c[4];
+			d1 = r.c[4] * r.c[4] - i.c[4] * i.c[4];
+			d2 = r.c[4] * i.c[4] + i.c[4] * r.c[4];
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = r.c[5] * r.c[5] - c.c[5] * c.c[5];
-			d2 = r.c[5] * c.c[5] + c.c[5] * r.c[5];
+			d1 = r.c[5] * r.c[5] - i.c[5] * i.c[5];
+			d2 = r.c[5] * i.c[5] + i.c[5] * r.c[5];
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = r.c[6] * r.c[6] - c.c[6] * c.c[6];
-			d2 = r.c[6] * c.c[6] + c.c[6] * r.c[6];
+			d1 = r.c[6] * r.c[6] - i.c[6] * i.c[6];
+			d2 = r.c[6] * i.c[6] + i.c[6] * r.c[6];
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
-			d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
+			d1 = r.c[7] * r.c[7] - i.c[7] * i.c[7];
+			d2 = r.c[7] * i.c[7] + i.c[7] * r.c[7];
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 	inline Array8Complex64 *divide(const Complex64 a) {
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + i.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + i.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + i.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + i.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -6400,89 +6589,89 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[4] * a.c.c[0] + i.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[5] * a.c.c[0] + i.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[6] * a.c.c[0] + i.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[7] * a.c.c[0] + i.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 	inline Array8Complex64 *divide(const Array8Complex64 &a) {
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
-		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		i.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + i.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
+		d2 = (i.c[4] * a.r.c[4] - r.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
-		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		i.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + i.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
+		d2 = (i.c[5] * a.r.c[5] - r.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
-		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		i.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + i.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
+		d2 = (i.c[6] * a.r.c[6] - r.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
-		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		i.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + i.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
+		d2 = (i.c[7] * a.r.c[7] - r.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -6490,267 +6679,267 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.i.c[0] + i.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[0] * a.i.c[0] - r.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-			d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+			d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-			d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+			d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
-			d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+			d1 = (r.c[4] * a.r.c[4] + i.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
+			d2 = (i.c[4] * a.r.c[4] - r.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
-			d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+			d1 = (r.c[5] * a.r.c[5] + i.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
+			d2 = (i.c[5] * a.r.c[5] - r.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
-			d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+			d1 = (r.c[6] * a.r.c[6] + i.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
+			d2 = (i.c[6] * a.r.c[6] - r.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
-			d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+			d1 = (r.c[7] * a.r.c[7] + i.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
+			d2 = (i.c[7] * a.r.c[7] - r.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 	inline Array8Complex64 operator/(const Complex64 &a) const {
 		Array8Complex64 ret;
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[2] = d1;
-		ret.c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[3] = d1;
-		ret.c.c[3] = d2;
-		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + i.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[4] = d1;
-		ret.c.c[4] = d2;
-		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + i.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[5] = d1;
-		ret.c.c[5] = d2;
-		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + i.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[6] = d1;
-		ret.c.c[6] = d2;
-		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + i.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[7] = d1;
-		ret.c.c[7] = d2;
+		ret.i.c[7] = d2;
 		return ret;
 	}
 
 	inline Array8Complex64 operator/(const Array8Complex64 &a) const {
 		Array8Complex64 ret;
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		ret.i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		ret.r.c[2] = d1;
-		ret.c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		ret.i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		ret.r.c[3] = d1;
-		ret.c.c[3] = d2;
-		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
-		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		ret.i.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + i.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
+		d2 = (i.c[4] * a.r.c[4] - r.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
 		ret.r.c[4] = d1;
-		ret.c.c[4] = d2;
-		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
-		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		ret.i.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + i.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
+		d2 = (i.c[5] * a.r.c[5] - r.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
 		ret.r.c[5] = d1;
-		ret.c.c[5] = d2;
-		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
-		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		ret.i.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + i.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
+		d2 = (i.c[6] * a.r.c[6] - r.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
 		ret.r.c[6] = d1;
-		ret.c.c[6] = d2;
-		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
-		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		ret.i.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + i.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
+		d2 = (i.c[7] * a.r.c[7] - r.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
 		ret.r.c[7] = d1;
-		ret.c.c[7] = d2;
+		ret.i.c[7] = d2;
 		return ret;
 	}
 
 	inline void operator/=(const Complex64 &a) {
-		double d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		double d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + i.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + i.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + i.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + i.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 	}
 
 	inline void operator/=(const Array8Complex64 &a) {
-		double d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		double d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		double d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		double d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
-		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		i.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + i.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
+		d2 = (i.c[4] * a.r.c[4] - r.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
-		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		i.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + i.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
+		d2 = (i.c[5] * a.r.c[5] - r.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
-		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		i.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + i.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
+		d2 = (i.c[6] * a.r.c[6] - r.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
-		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		i.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + i.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
+		d2 = (i.c[7] * a.r.c[7] - r.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 	}
 
 	inline Array8Complex64 *sqrt() {
 		double d1;
 		double d2;
-		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[0]);
 		} else LIKELY {
-			d1 = c.c[0] / (2 * d2);
+			d1 = i.c[0] / (2 * d2);
 		}
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		i.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[1]);
 		} else LIKELY {
-			d1 = c.c[1] / (2 * d2);
+			d1 = i.c[1] / (2 * d2);
 		}
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+		i.c[1] = d2;
+		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[2]);
 		} else LIKELY {
-			d1 = c.c[2] / (2 * d2);
+			d1 = i.c[2] / (2 * d2);
 		}
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+		i.c[2] = d2;
+		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[3]);
 		} else LIKELY {
-			d1 = c.c[3] / (2 * d2);
+			d1 = i.c[3] / (2 * d2);
 		}
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4])) / (2));
+		i.c[3] = d2;
+		d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + i.c[4] * i.c[4])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[4]);
 		} else LIKELY {
-			d1 = c.c[4] / (2 * d2);
+			d1 = i.c[4] / (2 * d2);
 		}
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5])) / (2));
+		i.c[4] = d2;
+		d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + i.c[5] * i.c[5])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[5]);
 		} else LIKELY {
-			d1 = c.c[5] / (2 * d2);
+			d1 = i.c[5] / (2 * d2);
 		}
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6])) / (2));
+		i.c[5] = d2;
+		d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + i.c[6] * i.c[6])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[6]);
 		} else LIKELY {
-			d1 = c.c[6] / (2 * d2);
+			d1 = i.c[6] / (2 * d2);
 		}
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7])) / (2));
+		i.c[6] = d2;
+		d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + i.c[7] * i.c[7])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[7]);
 		} else LIKELY {
-			d1 = c.c[7] / (2 * d2);
+			d1 = i.c[7] / (2 * d2);
 		}
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -6758,84 +6947,84 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[0]);
 			} else LIKELY {
-				d1 = c.c[0] / (2 * d2);
+				d1 = i.c[0] / (2 * d2);
 			}
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[1]);
 			} else LIKELY {
-				d1 = c.c[1] / (2 * d2);
+				d1 = i.c[1] / (2 * d2);
 			}
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[2]);
 			} else LIKELY {
-				d1 = c.c[2] / (2 * d2);
+				d1 = i.c[2] / (2 * d2);
 			}
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[3]);
 			} else LIKELY {
-				d1 = c.c[3] / (2 * d2);
+				d1 = i.c[3] / (2 * d2);
 			}
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4])) / (2));
+			d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + i.c[4] * i.c[4])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[4]);
 			} else LIKELY {
-				d1 = c.c[4] / (2 * d2);
+				d1 = i.c[4] / (2 * d2);
 			}
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5])) / (2));
+			d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + i.c[5] * i.c[5])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[5]);
 			} else LIKELY {
-				d1 = c.c[5] / (2 * d2);
+				d1 = i.c[5] / (2 * d2);
 			}
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6])) / (2));
+			d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + i.c[6] * i.c[6])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[6]);
 			} else LIKELY {
-				d1 = c.c[6] / (2 * d2);
+				d1 = i.c[6] / (2 * d2);
 			}
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7])) / (2));
+			d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + i.c[7] * i.c[7])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[7]);
 			} else LIKELY {
-				d1 = c.c[7] / (2 * d2);
+				d1 = i.c[7] / (2 * d2);
 			}
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -6843,114 +7032,114 @@ public:
 	inline Array8Complex64 *sin() {
 		double d1;
 		double d2;
-		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+		d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+		d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
-		d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+		i.c[1] = d2;
+		d1 = ::sin(r.c[2]) * ::cosh(i.c[2]);
+		d2 = ::cos(i.c[2]) * ::sinh(r.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
-		d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+		i.c[2] = d2;
+		d1 = ::sin(r.c[3]) * ::cosh(i.c[3]);
+		d2 = ::cos(i.c[3]) * ::sinh(r.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::sin(r.c[4]) * ::cosh(c.c[4]);
-		d2 = ::cos(c.c[4]) * ::sinh(r.c[4]);
+		i.c[3] = d2;
+		d1 = ::sin(r.c[4]) * ::cosh(i.c[4]);
+		d2 = ::cos(i.c[4]) * ::sinh(r.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::sin(r.c[5]) * ::cosh(c.c[5]);
-		d2 = ::cos(c.c[5]) * ::sinh(r.c[5]);
+		i.c[4] = d2;
+		d1 = ::sin(r.c[5]) * ::cosh(i.c[5]);
+		d2 = ::cos(i.c[5]) * ::sinh(r.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::sin(r.c[6]) * ::cosh(c.c[6]);
-		d2 = ::cos(c.c[6]) * ::sinh(r.c[6]);
+		i.c[5] = d2;
+		d1 = ::sin(r.c[6]) * ::cosh(i.c[6]);
+		d2 = ::cos(i.c[6]) * ::sinh(r.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::sin(r.c[7]) * ::cosh(c.c[7]);
-		d2 = ::cos(c.c[7]) * ::sinh(r.c[7]);
+		i.c[6] = d2;
+		d1 = ::sin(r.c[7]) * ::cosh(i.c[7]);
+		d2 = ::cos(i.c[7]) * ::sinh(r.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline Array8Complex64 *cos() {
 		double d1;
 		double d2;
-		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+		d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+		d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
-		d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+		i.c[1] = d2;
+		d1 = ::cos(r.c[2]) * ::cosh(i.c[2]);
+		d2 = -::sin(i.c[2]) * ::sinh(r.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
-		d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+		i.c[2] = d2;
+		d1 = ::cos(r.c[3]) * ::cosh(i.c[3]);
+		d2 = -::sin(i.c[3]) * ::sinh(r.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::cos(r.c[4]) * ::cosh(c.c[4]);
-		d2 = -::sin(c.c[4]) * ::sinh(r.c[4]);
+		i.c[3] = d2;
+		d1 = ::cos(r.c[4]) * ::cosh(i.c[4]);
+		d2 = -::sin(i.c[4]) * ::sinh(r.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::cos(r.c[5]) * ::cosh(c.c[5]);
-		d2 = -::sin(c.c[5]) * ::sinh(r.c[5]);
+		i.c[4] = d2;
+		d1 = ::cos(r.c[5]) * ::cosh(i.c[5]);
+		d2 = -::sin(i.c[5]) * ::sinh(r.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::cos(r.c[6]) * ::cosh(c.c[6]);
-		d2 = -::sin(c.c[6]) * ::sinh(r.c[6]);
+		i.c[5] = d2;
+		d1 = ::cos(r.c[6]) * ::cosh(i.c[6]);
+		d2 = -::sin(i.c[6]) * ::sinh(r.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::cos(r.c[7]) * ::cosh(c.c[7]);
-		d2 = -::sin(c.c[7]) * ::sinh(r.c[7]);
+		i.c[6] = d2;
+		d1 = ::cos(r.c[7]) * ::cosh(i.c[7]);
+		d2 = -::sin(i.c[7]) * ::sinh(r.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline Array8Complex64 *tan() {
 		double d1;
 		double d2;
-		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+		d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+		d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
-		d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		i.c[1] = d2;
+		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
+		d2 = ::sinh(i.c[2] + i.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
-		d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		i.c[2] = d2;
+		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
+		d2 = ::sinh(i.c[3] + i.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
-		d2 = ::sinh(c.c[4] + c.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+		i.c[3] = d2;
+		d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(i.c[4] + i.c[4]));
+		d2 = ::sinh(i.c[4] + i.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(i.c[4] + i.c[4]));
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
-		d2 = ::sinh(c.c[5] + c.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+		i.c[4] = d2;
+		d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(i.c[5] + i.c[5]));
+		d2 = ::sinh(i.c[5] + i.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(i.c[5] + i.c[5]));
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
-		d2 = ::sinh(c.c[6] + c.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+		i.c[5] = d2;
+		d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(i.c[6] + i.c[6]));
+		d2 = ::sinh(i.c[6] + i.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(i.c[6] + i.c[6]));
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
-		d2 = ::sinh(c.c[7] + c.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+		i.c[6] = d2;
+		d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(i.c[7] + i.c[7]));
+		d2 = ::sinh(i.c[7] + i.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(i.c[7] + i.c[7]));
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -6958,52 +7147,52 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+			d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+			d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
-			d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+			d1 = ::sin(r.c[2]) * ::cosh(i.c[2]);
+			d2 = ::cos(i.c[2]) * ::sinh(r.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
-			d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+			d1 = ::sin(r.c[3]) * ::cosh(i.c[3]);
+			d2 = ::cos(i.c[3]) * ::sinh(r.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::sin(r.c[4]) * ::cosh(c.c[4]);
-			d2 = ::cos(c.c[4]) * ::sinh(r.c[4]);
+			d1 = ::sin(r.c[4]) * ::cosh(i.c[4]);
+			d2 = ::cos(i.c[4]) * ::sinh(r.c[4]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::sin(r.c[5]) * ::cosh(c.c[5]);
-			d2 = ::cos(c.c[5]) * ::sinh(r.c[5]);
+			d1 = ::sin(r.c[5]) * ::cosh(i.c[5]);
+			d2 = ::cos(i.c[5]) * ::sinh(r.c[5]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::sin(r.c[6]) * ::cosh(c.c[6]);
-			d2 = ::cos(c.c[6]) * ::sinh(r.c[6]);
+			d1 = ::sin(r.c[6]) * ::cosh(i.c[6]);
+			d2 = ::cos(i.c[6]) * ::sinh(r.c[6]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::sin(r.c[7]) * ::cosh(c.c[7]);
-			d2 = ::cos(c.c[7]) * ::sinh(r.c[7]);
+			d1 = ::sin(r.c[7]) * ::cosh(i.c[7]);
+			d2 = ::cos(i.c[7]) * ::sinh(r.c[7]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -7012,52 +7201,52 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+			d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+			d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
-			d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+			d1 = ::cos(r.c[2]) * ::cosh(i.c[2]);
+			d2 = -::sin(i.c[2]) * ::sinh(r.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
-			d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+			d1 = ::cos(r.c[3]) * ::cosh(i.c[3]);
+			d2 = -::sin(i.c[3]) * ::sinh(r.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::cos(r.c[4]) * ::cosh(c.c[4]);
-			d2 = -::sin(c.c[4]) * ::sinh(r.c[4]);
+			d1 = ::cos(r.c[4]) * ::cosh(i.c[4]);
+			d2 = -::sin(i.c[4]) * ::sinh(r.c[4]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::cos(r.c[5]) * ::cosh(c.c[5]);
-			d2 = -::sin(c.c[5]) * ::sinh(r.c[5]);
+			d1 = ::cos(r.c[5]) * ::cosh(i.c[5]);
+			d2 = -::sin(i.c[5]) * ::sinh(r.c[5]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::cos(r.c[6]) * ::cosh(c.c[6]);
-			d2 = -::sin(c.c[6]) * ::sinh(r.c[6]);
+			d1 = ::cos(r.c[6]) * ::cosh(i.c[6]);
+			d2 = -::sin(i.c[6]) * ::sinh(r.c[6]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::cos(r.c[7]) * ::cosh(c.c[7]);
-			d2 = -::sin(c.c[7]) * ::sinh(r.c[7]);
+			d1 = ::cos(r.c[7]) * ::cosh(i.c[7]);
+			d2 = -::sin(i.c[7]) * ::sinh(r.c[7]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -7066,262 +7255,262 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+			d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+			d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
-			d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
+			d2 = ::sinh(i.c[2] + i.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
-			d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
+			d2 = ::sinh(i.c[3] + i.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
-			d2 = ::sinh(c.c[4] + c.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+			d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(i.c[4] + i.c[4]));
+			d2 = ::sinh(i.c[4] + i.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(i.c[4] + i.c[4]));
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
-			d2 = ::sinh(c.c[5] + c.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+			d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(i.c[5] + i.c[5]));
+			d2 = ::sinh(i.c[5] + i.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(i.c[5] + i.c[5]));
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
-			d2 = ::sinh(c.c[6] + c.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+			d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(i.c[6] + i.c[6]));
+			d2 = ::sinh(i.c[6] + i.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(i.c[6] + i.c[6]));
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
-			d2 = ::sinh(c.c[7] + c.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+			d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(i.c[7] + i.c[7]));
+			d2 = ::sinh(i.c[7] + i.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(i.c[7] + i.c[7]));
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 
 	inline Array8Complex64 *exp() {
-		double d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-		double d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		double d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+		double d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		i.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
-		d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+		i.c[1] = d2;
+		d1 = ::exp(r.c[2]) * ::cos(i.c[2]);
+		d2 = ::exp(r.c[2]) * ::sin(i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
-		d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+		i.c[2] = d2;
+		d1 = ::exp(r.c[3]) * ::cos(i.c[3]);
+		d2 = ::exp(r.c[3]) * ::sin(i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::exp(r.c[4]) * ::cos(c.c[4]);
-		d2 = ::exp(r.c[4]) * ::sin(c.c[4]);
+		i.c[3] = d2;
+		d1 = ::exp(r.c[4]) * ::cos(i.c[4]);
+		d2 = ::exp(r.c[4]) * ::sin(i.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::exp(r.c[5]) * ::cos(c.c[5]);
-		d2 = ::exp(r.c[5]) * ::sin(c.c[5]);
+		i.c[4] = d2;
+		d1 = ::exp(r.c[5]) * ::cos(i.c[5]);
+		d2 = ::exp(r.c[5]) * ::sin(i.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::exp(r.c[6]) * ::cos(c.c[6]);
-		d2 = ::exp(r.c[6]) * ::sin(c.c[6]);
+		i.c[5] = d2;
+		d1 = ::exp(r.c[6]) * ::cos(i.c[6]);
+		d2 = ::exp(r.c[6]) * ::sin(i.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::exp(r.c[7]) * ::cos(c.c[7]);
-		d2 = ::exp(r.c[7]) * ::sin(c.c[7]);
+		i.c[6] = d2;
+		d1 = ::exp(r.c[7]) * ::cos(i.c[7]);
+		d2 = ::exp(r.c[7]) * ::sin(i.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline Array8Complex64 *exp(double n) {
-		double d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-		double d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		double d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+		double d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		i.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
-		d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+		i.c[1] = d2;
+		d1 = ::pow(n, r.c[2]) * ::cos(i.c[2] * ::log(n));
+		d2 = ::pow(n, r.c[2]) * ::sin(i.c[2] * ::log(n));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
-		d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+		i.c[2] = d2;
+		d1 = ::pow(n, r.c[3]) * ::cos(i.c[3] * ::log(n));
+		d2 = ::pow(n, r.c[3]) * ::sin(i.c[3] * ::log(n));
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::pow(n, r.c[4]) * ::cos(c.c[4] * ::log(n));
-		d2 = ::pow(n, r.c[4]) * ::sin(c.c[4] * ::log(n));
+		i.c[3] = d2;
+		d1 = ::pow(n, r.c[4]) * ::cos(i.c[4] * ::log(n));
+		d2 = ::pow(n, r.c[4]) * ::sin(i.c[4] * ::log(n));
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::pow(n, r.c[5]) * ::cos(c.c[5] * ::log(n));
-		d2 = ::pow(n, r.c[5]) * ::sin(c.c[5] * ::log(n));
+		i.c[4] = d2;
+		d1 = ::pow(n, r.c[5]) * ::cos(i.c[5] * ::log(n));
+		d2 = ::pow(n, r.c[5]) * ::sin(i.c[5] * ::log(n));
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::pow(n, r.c[6]) * ::cos(c.c[6] * ::log(n));
-		d2 = ::pow(n, r.c[6]) * ::sin(c.c[6] * ::log(n));
+		i.c[5] = d2;
+		d1 = ::pow(n, r.c[6]) * ::cos(i.c[6] * ::log(n));
+		d2 = ::pow(n, r.c[6]) * ::sin(i.c[6] * ::log(n));
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::pow(n, r.c[7]) * ::cos(c.c[7] * ::log(n));
-		d2 = ::pow(n, r.c[7]) * ::sin(c.c[7] * ::log(n));
+		i.c[6] = d2;
+		d1 = ::pow(n, r.c[7]) * ::cos(i.c[7] * ::log(n));
+		d2 = ::pow(n, r.c[7]) * ::sin(i.c[7] * ::log(n));
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline Array8Complex64 *pow(Array8Complex64 n) {
-		double d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		double d2 = ::atan2(r.c[0], c.c[0]);
-		double d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-		double d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		double d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		double d2 = ::atan2(r.c[0], i.c[0]);
+		double d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+		double d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 		double d5 = d3 * ::cos(d4);
 		double d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
-		d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		d3 = ::exp(d1 * n.i.c[2] - d2 * n.r.c[2]);
+		d4 = d1 * n.r.c[2] + d2 * n.i.c[2];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[2] = d5;
+		i.c[2] = d5;
 		r.c[2] = d6;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
-		d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		d3 = ::exp(d1 * n.i.c[3] - d2 * n.r.c[3]);
+		d4 = d1 * n.r.c[3] + d2 * n.i.c[3];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[3] = d5;
+		i.c[3] = d5;
 		r.c[3] = d6;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-		d2 = ::atan2(r.c[4], c.c[4]);
-		d3 = ::exp(d1 * n.c.c[4] - d2 * n.r.c[4]);
-		d4 = d1 * n.r.c[4] + d2 * n.c.c[4];
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], i.c[4]);
+		d3 = ::exp(d1 * n.i.c[4] - d2 * n.r.c[4]);
+		d4 = d1 * n.r.c[4] + d2 * n.i.c[4];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[4] = d5;
+		i.c[4] = d5;
 		r.c[4] = d6;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-		d2 = ::atan2(r.c[5], c.c[5]);
-		d3 = ::exp(d1 * n.c.c[5] - d2 * n.r.c[5]);
-		d4 = d1 * n.r.c[5] + d2 * n.c.c[5];
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], i.c[5]);
+		d3 = ::exp(d1 * n.i.c[5] - d2 * n.r.c[5]);
+		d4 = d1 * n.r.c[5] + d2 * n.i.c[5];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[5] = d5;
+		i.c[5] = d5;
 		r.c[5] = d6;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-		d2 = ::atan2(r.c[6], c.c[6]);
-		d3 = ::exp(d1 * n.c.c[6] - d2 * n.r.c[6]);
-		d4 = d1 * n.r.c[6] + d2 * n.c.c[6];
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], i.c[6]);
+		d3 = ::exp(d1 * n.i.c[6] - d2 * n.r.c[6]);
+		d4 = d1 * n.r.c[6] + d2 * n.i.c[6];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[6] = d5;
+		i.c[6] = d5;
 		r.c[6] = d6;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-		d2 = ::atan2(r.c[7], c.c[7]);
-		d3 = ::exp(d1 * n.c.c[7] - d2 * n.r.c[7]);
-		d4 = d1 * n.r.c[7] + d2 * n.c.c[7];
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], i.c[7]);
+		d3 = ::exp(d1 * n.i.c[7] - d2 * n.r.c[7]);
+		d4 = d1 * n.r.c[7] + d2 * n.i.c[7];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[7] = d5;
+		i.c[7] = d5;
 		r.c[7] = d6;
 		return this;
 	}
 
 
 	inline Array8Complex64 *pow(Complex64 n) {
-		double d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		double d2 = ::atan2(r.c[0], c.c[0]);
+		double d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		double d2 = ::atan2(r.c[0], i.c[0]);
 		double d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		double d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		double d5 = d3 * ::cos(d4);
 		double d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[2] = d5;
+		i.c[2] = d5;
 		r.c[2] = d6;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[3] = d5;
+		i.c[3] = d5;
 		r.c[3] = d6;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-		d2 = ::atan2(r.c[4], c.c[4]);
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], i.c[4]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[4] = d5;
+		i.c[4] = d5;
 		r.c[4] = d6;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-		d2 = ::atan2(r.c[5], c.c[5]);
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], i.c[5]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[5] = d5;
+		i.c[5] = d5;
 		r.c[5] = d6;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-		d2 = ::atan2(r.c[6], c.c[6]);
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], i.c[6]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[6] = d5;
+		i.c[6] = d5;
 		r.c[6] = d6;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-		d2 = ::atan2(r.c[7], c.c[7]);
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], i.c[7]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[7] = d5;
+		i.c[7] = d5;
 		r.c[7] = d6;
 		return this;
 	}
@@ -7334,83 +7523,83 @@ public:
 		double d5;
 		double d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
-			d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			d3 = ::exp(d1 * n.i.c[2] - d2 * n.r.c[2]);
+			d4 = d1 * n.r.c[2] + d2 * n.i.c[2];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[2] = d5;
+			i.c[2] = d5;
 			r.c[2] = d6;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
-			d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			d3 = ::exp(d1 * n.i.c[3] - d2 * n.r.c[3]);
+			d4 = d1 * n.r.c[3] + d2 * n.i.c[3];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[3] = d5;
+			i.c[3] = d5;
 			r.c[3] = d6;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-			d2 = ::atan2(r.c[4], c.c[4]);
-			d3 = ::exp(d1 * n.c.c[4] - d2 * n.r.c[4]);
-			d4 = d1 * n.r.c[4] + d2 * n.c.c[4];
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], i.c[4]);
+			d3 = ::exp(d1 * n.i.c[4] - d2 * n.r.c[4]);
+			d4 = d1 * n.r.c[4] + d2 * n.i.c[4];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[4] = d5;
+			i.c[4] = d5;
 			r.c[4] = d6;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-			d2 = ::atan2(r.c[5], c.c[5]);
-			d3 = ::exp(d1 * n.c.c[5] - d2 * n.r.c[5]);
-			d4 = d1 * n.r.c[5] + d2 * n.c.c[5];
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], i.c[5]);
+			d3 = ::exp(d1 * n.i.c[5] - d2 * n.r.c[5]);
+			d4 = d1 * n.r.c[5] + d2 * n.i.c[5];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[5] = d5;
+			i.c[5] = d5;
 			r.c[5] = d6;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-			d2 = ::atan2(r.c[6], c.c[6]);
-			d3 = ::exp(d1 * n.c.c[6] - d2 * n.r.c[6]);
-			d4 = d1 * n.r.c[6] + d2 * n.c.c[6];
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], i.c[6]);
+			d3 = ::exp(d1 * n.i.c[6] - d2 * n.r.c[6]);
+			d4 = d1 * n.r.c[6] + d2 * n.i.c[6];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[6] = d5;
+			i.c[6] = d5;
 			r.c[6] = d6;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-			d2 = ::atan2(r.c[7], c.c[7]);
-			d3 = ::exp(d1 * n.c.c[7] - d2 * n.r.c[7]);
-			d4 = d1 * n.r.c[7] + d2 * n.c.c[7];
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], i.c[7]);
+			d3 = ::exp(d1 * n.i.c[7] - d2 * n.r.c[7]);
+			d4 = d1 * n.r.c[7] + d2 * n.i.c[7];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[7] = d5;
+			i.c[7] = d5;
 			r.c[7] = d6;
 		}
 		return this;
@@ -7425,83 +7614,83 @@ public:
 		double d5;
 		double d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[2] = d5;
+			i.c[2] = d5;
 			r.c[2] = d6;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[3] = d5;
+			i.c[3] = d5;
 			r.c[3] = d6;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-			d2 = ::atan2(r.c[4], c.c[4]);
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], i.c[4]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[4] = d5;
+			i.c[4] = d5;
 			r.c[4] = d6;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-			d2 = ::atan2(r.c[5], c.c[5]);
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], i.c[5]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[5] = d5;
+			i.c[5] = d5;
 			r.c[5] = d6;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-			d2 = ::atan2(r.c[6], c.c[6]);
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], i.c[6]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[6] = d5;
+			i.c[6] = d5;
 			r.c[6] = d6;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-			d2 = ::atan2(r.c[7], c.c[7]);
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], i.c[7]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[7] = d5;
+			i.c[7] = d5;
 			r.c[7] = d6;
 		}
 		return this;
@@ -7511,52 +7700,52 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
-			d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+			d1 = ::exp(r.c[2]) * ::cos(i.c[2]);
+			d2 = ::exp(r.c[2]) * ::sin(i.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
-			d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+			d1 = ::exp(r.c[3]) * ::cos(i.c[3]);
+			d2 = ::exp(r.c[3]) * ::sin(i.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::exp(r.c[4]) * ::cos(c.c[4]);
-			d2 = ::exp(r.c[4]) * ::sin(c.c[4]);
+			d1 = ::exp(r.c[4]) * ::cos(i.c[4]);
+			d2 = ::exp(r.c[4]) * ::sin(i.c[4]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::exp(r.c[5]) * ::cos(c.c[5]);
-			d2 = ::exp(r.c[5]) * ::sin(c.c[5]);
+			d1 = ::exp(r.c[5]) * ::cos(i.c[5]);
+			d2 = ::exp(r.c[5]) * ::sin(i.c[5]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::exp(r.c[6]) * ::cos(c.c[6]);
-			d2 = ::exp(r.c[6]) * ::sin(c.c[6]);
+			d1 = ::exp(r.c[6]) * ::cos(i.c[6]);
+			d2 = ::exp(r.c[6]) * ::sin(i.c[6]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::exp(r.c[7]) * ::cos(c.c[7]);
-			d2 = ::exp(r.c[7]) * ::sin(c.c[7]);
+			d1 = ::exp(r.c[7]) * ::cos(i.c[7]);
+			d2 = ::exp(r.c[7]) * ::sin(i.c[7]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -7565,52 +7754,52 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
-			d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+			d1 = ::pow(n, r.c[2]) * ::cos(i.c[2] * ::log(n));
+			d2 = ::pow(n, r.c[2]) * ::sin(i.c[2] * ::log(n));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
-			d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+			d1 = ::pow(n, r.c[3]) * ::cos(i.c[3] * ::log(n));
+			d2 = ::pow(n, r.c[3]) * ::sin(i.c[3] * ::log(n));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::pow(n, r.c[4]) * ::cos(c.c[4] * ::log(n));
-			d2 = ::pow(n, r.c[4]) * ::sin(c.c[4] * ::log(n));
+			d1 = ::pow(n, r.c[4]) * ::cos(i.c[4] * ::log(n));
+			d2 = ::pow(n, r.c[4]) * ::sin(i.c[4] * ::log(n));
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::pow(n, r.c[5]) * ::cos(c.c[5] * ::log(n));
-			d2 = ::pow(n, r.c[5]) * ::sin(c.c[5] * ::log(n));
+			d1 = ::pow(n, r.c[5]) * ::cos(i.c[5] * ::log(n));
+			d2 = ::pow(n, r.c[5]) * ::sin(i.c[5] * ::log(n));
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::pow(n, r.c[6]) * ::cos(c.c[6] * ::log(n));
-			d2 = ::pow(n, r.c[6]) * ::sin(c.c[6] * ::log(n));
+			d1 = ::pow(n, r.c[6]) * ::cos(i.c[6] * ::log(n));
+			d2 = ::pow(n, r.c[6]) * ::sin(i.c[6] * ::log(n));
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::pow(n, r.c[7]) * ::cos(c.c[7] * ::log(n));
-			d2 = ::pow(n, r.c[7]) * ::sin(c.c[7] * ::log(n));
+			d1 = ::pow(n, r.c[7]) * ::cos(i.c[7] * ::log(n));
+			d2 = ::pow(n, r.c[7]) * ::sin(i.c[7] * ::log(n));
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -7618,38 +7807,38 @@ public:
 	inline Array8Complex64 *pow(double n) {
 		double d1;
 		double d2;
-		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		i.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
-		d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+		i.c[1] = d2;
+		d1 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::cos(n * atan2(i.c[2], r.c[2]));
+		d2 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::sin(n * atan2(i.c[2], r.c[2]));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
-		d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+		i.c[2] = d2;
+		d1 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::cos(n * atan2(i.c[3], r.c[3]));
+		d2 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::sin(n * atan2(i.c[3], r.c[3]));
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::cos(n * atan2(c.c[4], r.c[4]));
-		d2 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::sin(n * atan2(c.c[4], r.c[4]));
+		i.c[3] = d2;
+		d1 = ::pow(r.c[4] * r.c[4] + i.c[4] * i.c[4], n / 2) * ::cos(n * atan2(i.c[4], r.c[4]));
+		d2 = ::pow(r.c[4] * r.c[4] + i.c[4] * i.c[4], n / 2) * ::sin(n * atan2(i.c[4], r.c[4]));
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::cos(n * atan2(c.c[5], r.c[5]));
-		d2 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::sin(n * atan2(c.c[5], r.c[5]));
+		i.c[4] = d2;
+		d1 = ::pow(r.c[5] * r.c[5] + i.c[5] * i.c[5], n / 2) * ::cos(n * atan2(i.c[5], r.c[5]));
+		d2 = ::pow(r.c[5] * r.c[5] + i.c[5] * i.c[5], n / 2) * ::sin(n * atan2(i.c[5], r.c[5]));
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::cos(n * atan2(c.c[6], r.c[6]));
-		d2 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::sin(n * atan2(c.c[6], r.c[6]));
+		i.c[5] = d2;
+		d1 = ::pow(r.c[6] * r.c[6] + i.c[6] * i.c[6], n / 2) * ::cos(n * atan2(i.c[6], r.c[6]));
+		d2 = ::pow(r.c[6] * r.c[6] + i.c[6] * i.c[6], n / 2) * ::sin(n * atan2(i.c[6], r.c[6]));
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::cos(n * atan2(c.c[7], r.c[7]));
-		d2 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::sin(n * atan2(c.c[7], r.c[7]));
+		i.c[6] = d2;
+		d1 = ::pow(r.c[7] * r.c[7] + i.c[7] * i.c[7], n / 2) * ::cos(n * atan2(i.c[7], r.c[7]));
+		d2 = ::pow(r.c[7] * r.c[7] + i.c[7] * i.c[7], n / 2) * ::sin(n * atan2(i.c[7], r.c[7]));
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 
 		return this;
 	}
@@ -7658,105 +7847,105 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
-			d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+			d1 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::cos(n * atan2(i.c[2], r.c[2]));
+			d2 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::sin(n * atan2(i.c[2], r.c[2]));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
-			d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+			d1 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::cos(n * atan2(i.c[3], r.c[3]));
+			d2 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::sin(n * atan2(i.c[3], r.c[3]));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::cos(n * atan2(c.c[4], r.c[4]));
-			d2 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::sin(n * atan2(c.c[4], r.c[4]));
+			d1 = ::pow(r.c[4] * r.c[4] + i.c[4] * i.c[4], n / 2) * ::cos(n * atan2(i.c[4], r.c[4]));
+			d2 = ::pow(r.c[4] * r.c[4] + i.c[4] * i.c[4], n / 2) * ::sin(n * atan2(i.c[4], r.c[4]));
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::cos(n * atan2(c.c[5], r.c[5]));
-			d2 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::sin(n * atan2(c.c[5], r.c[5]));
+			d1 = ::pow(r.c[5] * r.c[5] + i.c[5] * i.c[5], n / 2) * ::cos(n * atan2(i.c[5], r.c[5]));
+			d2 = ::pow(r.c[5] * r.c[5] + i.c[5] * i.c[5], n / 2) * ::sin(n * atan2(i.c[5], r.c[5]));
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::cos(n * atan2(c.c[6], r.c[6]));
-			d2 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::sin(n * atan2(c.c[6], r.c[6]));
+			d1 = ::pow(r.c[6] * r.c[6] + i.c[6] * i.c[6], n / 2) * ::cos(n * atan2(i.c[6], r.c[6]));
+			d2 = ::pow(r.c[6] * r.c[6] + i.c[6] * i.c[6], n / 2) * ::sin(n * atan2(i.c[6], r.c[6]));
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::cos(n * atan2(c.c[7], r.c[7]));
-			d2 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::sin(n * atan2(c.c[7], r.c[7]));
+			d1 = ::pow(r.c[7] * r.c[7] + i.c[7] * i.c[7], n / 2) * ::cos(n * atan2(i.c[7], r.c[7]));
+			d2 = ::pow(r.c[7] * r.c[7] + i.c[7] * i.c[7], n / 2) * ::sin(n * atan2(i.c[7], r.c[7]));
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 	inline VectorDouble8D abs() {
 		VectorDouble8D ret;
-		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
-		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
-		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2]);
-		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3]);
-		ret.v.c[4] = ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4]);
-		ret.v.c[5] = ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5]);
-		ret.v.c[6] = ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6]);
-		ret.v.c[7] = ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7]);
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1]);
+		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2]);
+		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3]);
+		ret.v.c[4] = ::sqrt(r.c[4] * r.c[4] + i.c[4] * i.c[4]);
+		ret.v.c[5] = ::sqrt(r.c[5] * r.c[5] + i.c[5] * i.c[5]);
+		ret.v.c[6] = ::sqrt(r.c[6] * r.c[6] + i.c[6] * i.c[6]);
+		ret.v.c[7] = ::sqrt(r.c[7] * r.c[7] + i.c[7] * i.c[7]);
 		return ret;
 	}
 
 	inline VectorU8_8D abs_gt(double a) {
 		VectorU8_8D ret;
-		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a < r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a < r.c[3] * r.c[3] + c.c[3] * c.c[3];
-		ret.v.c[4] = a * a < r.c[4] * r.c[4] + c.c[4] * c.c[4];
-		ret.v.c[5] = a * a < r.c[5] * r.c[5] + c.c[5] * c.c[5];
-		ret.v.c[6] = a * a < r.c[6] * r.c[6] + c.c[6] * c.c[6];
-		ret.v.c[7] = a * a < r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a < r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a < r.c[3] * r.c[3] + i.c[3] * i.c[3];
+		ret.v.c[4] = a * a < r.c[4] * r.c[4] + i.c[4] * i.c[4];
+		ret.v.c[5] = a * a < r.c[5] * r.c[5] + i.c[5] * i.c[5];
+		ret.v.c[6] = a * a < r.c[6] * r.c[6] + i.c[6] * i.c[6];
+		ret.v.c[7] = a * a < r.c[7] * r.c[7] + i.c[7] * i.c[7];
 		return ret;
 	}
 
 	inline VectorU8_8D abs_lt(double a) {
 		VectorU8_8D ret;
-		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a > r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a > r.c[3] * r.c[3] + c.c[3] * c.c[3];
-		ret.v.c[4] = a * a > r.c[4] * r.c[4] + c.c[4] * c.c[4];
-		ret.v.c[5] = a * a > r.c[5] * r.c[5] + c.c[5] * c.c[5];
-		ret.v.c[6] = a * a > r.c[6] * r.c[6] + c.c[6] * c.c[6];
-		ret.v.c[7] = a * a > r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a > r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a > r.c[3] * r.c[3] + i.c[3] * i.c[3];
+		ret.v.c[4] = a * a > r.c[4] * r.c[4] + i.c[4] * i.c[4];
+		ret.v.c[5] = a * a > r.c[5] * r.c[5] + i.c[5] * i.c[5];
+		ret.v.c[6] = a * a > r.c[6] * r.c[6] + i.c[6] * i.c[6];
+		ret.v.c[7] = a * a > r.c[7] * r.c[7] + i.c[7] * i.c[7];
 		return ret;
 	}
 
 	inline VectorU8_8D abs_eq(double a) {
 		VectorU8_8D ret;
-		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a == r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a == r.c[3] * r.c[3] + c.c[3] * c.c[3];
-		ret.v.c[4] = a * a == r.c[4] * r.c[4] + c.c[4] * c.c[4];
-		ret.v.c[5] = a * a == r.c[5] * r.c[5] + c.c[5] * c.c[5];
-		ret.v.c[6] = a * a == r.c[6] * r.c[6] + c.c[6] * c.c[6];
-		ret.v.c[7] = a * a == r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a == r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a == r.c[3] * r.c[3] + i.c[3] * i.c[3];
+		ret.v.c[4] = a * a == r.c[4] * r.c[4] + i.c[4] * i.c[4];
+		ret.v.c[5] = a * a == r.c[5] * r.c[5] + i.c[5] * i.c[5];
+		ret.v.c[6] = a * a == r.c[6] * r.c[6] + i.c[6] * i.c[6];
+		ret.v.c[7] = a * a == r.c[7] * r.c[7] + i.c[7] * i.c[7];
 		return ret;
 	}
 
@@ -7764,51 +7953,51 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-			d2 = ::atan2(r.c[4], c.c[4]);
-			c.c[4] = d1;
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], i.c[4]);
+			i.c[4] = d1;
 			r.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-			d2 = ::atan2(r.c[5], c.c[5]);
-			c.c[5] = d1;
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], i.c[5]);
+			i.c[5] = d1;
 			r.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-			d2 = ::atan2(r.c[6], c.c[6]);
-			c.c[6] = d1;
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], i.c[6]);
+			i.c[6] = d1;
 			r.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-			d2 = ::atan2(r.c[7], c.c[7]);
-			c.c[7] = d1;
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], i.c[7]);
+			i.c[7] = d1;
 			r.c[7] = d2;
 		}
 		return this;
@@ -7818,51 +8007,51 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-			d2 = ::atan2(r.c[4], c.c[4]);
-			c.c[4] = d1;
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], i.c[4]);
+			i.c[4] = d1;
 			r.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-			d2 = ::atan2(r.c[5], c.c[5]);
-			c.c[5] = d1;
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], i.c[5]);
+			i.c[5] = d1;
 			r.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-			d2 = ::atan2(r.c[6], c.c[6]);
-			c.c[6] = d1;
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], i.c[6]);
+			i.c[6] = d1;
 			r.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-			d2 = ::atan2(r.c[7], c.c[7]);
-			c.c[7] = d1;
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], i.c[7]);
+			i.c[7] = d1;
 			r.c[7] = d2;
 		}
 		return this;
@@ -7872,51 +8061,51 @@ public:
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[2], i.c[2]) / AML_LN10;
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[3], i.c[3]) / AML_LN10;
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[4], c.c[4]) / AML_LN10;
-			c.c[4] = d1;
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[4], i.c[4]) / AML_LN10;
+			i.c[4] = d1;
 			r.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[5], c.c[5]) / AML_LN10;
-			c.c[5] = d1;
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[5], i.c[5]) / AML_LN10;
+			i.c[5] = d1;
 			r.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[6], c.c[6]) / AML_LN10;
-			c.c[6] = d1;
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[6], i.c[6]) / AML_LN10;
+			i.c[6] = d1;
 			r.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[7], c.c[7]) / AML_LN10;
-			c.c[7] = d1;
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[7], i.c[7]) / AML_LN10;
+			i.c[7] = d1;
 			r.c[7] = d2;
 		}
 		return this;
@@ -7925,37 +8114,37 @@ public:
 	inline Array8Complex64 *ln() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		i.c[3] = d1;
 		r.c[3] = d2;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-		d2 = ::atan2(r.c[4], c.c[4]);
-		c.c[4] = d1;
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], i.c[4]);
+		i.c[4] = d1;
 		r.c[4] = d2;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-		d2 = ::atan2(r.c[5], c.c[5]);
-		c.c[5] = d1;
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], i.c[5]);
+		i.c[5] = d1;
 		r.c[5] = d2;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-		d2 = ::atan2(r.c[6], c.c[6]);
-		c.c[6] = d1;
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], i.c[6]);
+		i.c[6] = d1;
 		r.c[6] = d2;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-		d2 = ::atan2(r.c[7], c.c[7]);
-		c.c[7] = d1;
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], i.c[7]);
+		i.c[7] = d1;
 		r.c[7] = d2;
 		return this;
 	}
@@ -7963,37 +8152,37 @@ public:
 	inline Array8Complex64 *log() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		i.c[3] = d1;
 		r.c[3] = d2;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-		d2 = ::atan2(r.c[4], c.c[4]);
-		c.c[4] = d1;
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], i.c[4]);
+		i.c[4] = d1;
 		r.c[4] = d2;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-		d2 = ::atan2(r.c[5], c.c[5]);
-		c.c[5] = d1;
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], i.c[5]);
+		i.c[5] = d1;
 		r.c[5] = d2;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-		d2 = ::atan2(r.c[6], c.c[6]);
-		c.c[6] = d1;
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], i.c[6]);
+		i.c[6] = d1;
 		r.c[6] = d2;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-		d2 = ::atan2(r.c[7], c.c[7]);
-		c.c[7] = d1;
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], i.c[7]);
+		i.c[7] = d1;
 		r.c[7] = d2;
 		return this;
 	}
@@ -8001,58 +8190,96 @@ public:
 	inline Array8Complex64 *log10() {
 		double d1;
 		double d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[2], i.c[2]) / AML_LN10;
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[3], i.c[3]) / AML_LN10;
+		i.c[3] = d1;
 		r.c[3] = d2;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[4], c.c[4]) / AML_LN10;
-		c.c[4] = d1;
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[4], i.c[4]) / AML_LN10;
+		i.c[4] = d1;
 		r.c[4] = d2;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[5], c.c[5]) / AML_LN10;
-		c.c[5] = d1;
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[5], i.c[5]) / AML_LN10;
+		i.c[5] = d1;
 		r.c[5] = d2;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[6], c.c[6]) / AML_LN10;
-		c.c[6] = d1;
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[6], i.c[6]) / AML_LN10;
+		i.c[6] = d1;
 		r.c[6] = d2;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[7], c.c[7]) / AML_LN10;
-		c.c[7] = d1;
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[7], i.c[7]) / AML_LN10;
+		i.c[7] = d1;
 		r.c[7] = d2;
 		return this;
+	}
+
+	class Complex64_8_Itr : public std::iterator<
+			std::input_iterator_tag,   // iterator_category
+			Complex64Ptr,                      // value_type
+			long,                      // difference_type
+			const Complex64Ptr *,               // pointer
+			Complex64Ptr                       // reference
+	> {
+
+		Array8Complex64 *a;
+		int position;
+
+	public:
+		inline explicit Complex64_8_Itr(Array8Complex64 *array, int length) : a(array), position(length) {
+
+		}
+
+		inline Complex64_8_Itr &operator++() {
+			position++;
+			return *this;
+		}
+
+		inline bool operator==(Complex64_8_Itr other) const { return position == other.position; }
+
+		inline bool operator!=(Complex64_8_Itr other) const { return !(*this == other); }
+
+		inline reference operator*() const { return Complex64Ptr(&a->r.c[position], &a->i.c[position], position); }
+
+
+	};
+
+	inline Complex64_8_Itr begin() {
+		return Complex64_8_Itr(this, 0);
+	}
+
+	inline Complex64_8_Itr end() {
+		return Complex64_8_Itr(this, 8);
 	}
 
 };
 
 inline std::string operator<<(std::string &lhs, const Array8Complex64 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
-		   << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
-		   << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i ,  "
+		   << rhs.r.c[4] << " + " << rhs.i.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.i.c[5] << "i ,  " << rhs.r.c[6]
+		   << " + " << rhs.i.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.i.c[7] << "i }";
 	return string.str();
 }
 
 inline std::string operator<<(const char *lhs, const Array8Complex64 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
-		   << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
-		   << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i ,  "
+		   << rhs.r.c[4] << " + " << rhs.i.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.i.c[5] << "i ,  " << rhs.r.c[6]
+		   << " + " << rhs.i.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.i.c[7] << "i }";
 	return string.str();
 }
 
@@ -8063,10 +8290,10 @@ operator<<(std::basic_ostream<charT, traits> &o, const Array8Complex64 &rhs) {
 	s.flags(o.flags());
 	s.imbue(o.getloc());
 	s.precision(o.precision());
-	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-	  << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
-	  << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
-	  << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	s << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+	  << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i ,  "
+	  << rhs.r.c[4] << " + " << rhs.i.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.i.c[5] << "i ,  " << rhs.r.c[6]
+	  << " + " << rhs.i.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.i.c[7] << "i }";
 	return o << s.str();
 }
 
@@ -8076,14 +8303,14 @@ inline Array8Complex64 operator+(const Complex64 &lhs, const Array8Complex64 &rh
 
 inline Array8Complex64 operator-(const Complex64 &lhs, const Array8Complex64 &rhs) {
 	Array8Complex64 ret;
-	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
-	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
-	ret.c.c[2] = lhs.c.c[1] - rhs.c.c[2];
-	ret.c.c[3] = lhs.c.c[1] - rhs.c.c[3];
-	ret.c.c[4] = lhs.c.c[1] - rhs.c.c[4];
-	ret.c.c[5] = lhs.c.c[1] - rhs.c.c[5];
-	ret.c.c[6] = lhs.c.c[1] - rhs.c.c[6];
-	ret.c.c[7] = lhs.c.c[1] - rhs.c.c[7];
+	ret.i.c[0] = lhs.c.c[1] - rhs.i.c[0];
+	ret.i.c[1] = lhs.c.c[1] - rhs.i.c[1];
+	ret.i.c[2] = lhs.c.c[1] - rhs.i.c[2];
+	ret.i.c[3] = lhs.c.c[1] - rhs.i.c[3];
+	ret.i.c[4] = lhs.c.c[1] - rhs.i.c[4];
+	ret.i.c[5] = lhs.c.c[1] - rhs.i.c[5];
+	ret.i.c[6] = lhs.c.c[1] - rhs.i.c[6];
+	ret.i.c[7] = lhs.c.c[1] - rhs.i.c[7];
 	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
 	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
 	ret.r.c[2] = lhs.c.c[0] - rhs.r.c[2];
@@ -8102,39 +8329,39 @@ inline Array8Complex64 operator*(const Complex64 &lhs, const Array8Complex64 &rh
 inline Array8Complex64 operator/(const Complex64 &lhs, const Array8Complex64 &rhs) {
 	Array8Complex64 ret;
 	double d1 =
-			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	double d2 =
-			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	ret.r.c[0] = d1;
-	ret.c.c[0] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
-	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.i.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
 	ret.r.c[1] = d1;
-	ret.c.c[1] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
-	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	ret.i.c[1] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.i.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.i.c[2] * rhs.i.c[2]);
+	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.i.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.i.c[2] * rhs.i.c[2]);
 	ret.r.c[2] = d1;
-	ret.c.c[2] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
-	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	ret.i.c[2] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.i.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.i.c[3] * rhs.i.c[3]);
+	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.i.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.i.c[3] * rhs.i.c[3]);
 	ret.r.c[3] = d1;
-	ret.c.c[3] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[4] + lhs.c.c[1] * rhs.c.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.c.c[4] * rhs.c.c[4]);
-	d2 = (lhs.c.c[1] * rhs.r.c[4] - lhs.c.c[0] * rhs.c.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.c.c[4] * rhs.c.c[4]);
+	ret.i.c[3] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[4] + lhs.c.c[1] * rhs.i.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.i.c[4] * rhs.i.c[4]);
+	d2 = (lhs.c.c[1] * rhs.r.c[4] - lhs.c.c[0] * rhs.i.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.i.c[4] * rhs.i.c[4]);
 	ret.r.c[4] = d1;
-	ret.c.c[4] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[5] + lhs.c.c[1] * rhs.c.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.c.c[5] * rhs.c.c[5]);
-	d2 = (lhs.c.c[1] * rhs.r.c[5] - lhs.c.c[0] * rhs.c.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.c.c[5] * rhs.c.c[5]);
+	ret.i.c[4] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[5] + lhs.c.c[1] * rhs.i.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.i.c[5] * rhs.i.c[5]);
+	d2 = (lhs.c.c[1] * rhs.r.c[5] - lhs.c.c[0] * rhs.i.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.i.c[5] * rhs.i.c[5]);
 	ret.r.c[5] = d1;
-	ret.c.c[5] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[6] + lhs.c.c[1] * rhs.c.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.c.c[6] * rhs.c.c[6]);
-	d2 = (lhs.c.c[1] * rhs.r.c[6] - lhs.c.c[0] * rhs.c.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.c.c[6] * rhs.c.c[6]);
+	ret.i.c[5] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[6] + lhs.c.c[1] * rhs.i.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.i.c[6] * rhs.i.c[6]);
+	d2 = (lhs.c.c[1] * rhs.r.c[6] - lhs.c.c[0] * rhs.i.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.i.c[6] * rhs.i.c[6]);
 	ret.r.c[6] = d1;
-	ret.c.c[6] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[7] + lhs.c.c[1] * rhs.c.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.c.c[7] * rhs.c.c[7]);
-	d2 = (lhs.c.c[1] * rhs.r.c[7] - lhs.c.c[0] * rhs.c.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.c.c[7] * rhs.c.c[7]);
+	ret.i.c[6] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[7] + lhs.c.c[1] * rhs.i.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.i.c[7] * rhs.i.c[7]);
+	d2 = (lhs.c.c[1] * rhs.r.c[7] - lhs.c.c[0] * rhs.i.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.i.c[7] * rhs.i.c[7]);
 	ret.r.c[7] = d1;
-	ret.c.c[7] = d2;
+	ret.i.c[7] = d2;
 	return ret;
 }
 
@@ -8724,15 +8951,15 @@ inline std::complex<float> toStdComplex(Complex32 a) {
 class Array2Complex32 {
 public:
 	floatvec2 r{};
-	floatvec2 c{};
+	floatvec2 i{};
 
 	inline Array2Complex32() {}
 
 	inline Array2Complex32(Complex32 value) {
 		r.c[0] = value.c.c[0];
-		c.c[0] = value.c.c[1];
+		i.c[0] = value.c.c[1];
 		r.c[1] = value.c.c[0];
-		c.c[1] = value.c.c[1];
+		i.c[1] = value.c.c[1];
 	}
 
 
@@ -8741,44 +8968,44 @@ public:
 	}
 
 	inline VectorFloat2D complex() {
-		return VectorFloat2D(c.c);
+		return VectorFloat2D(i.c);
 	}
 
 	inline Complex32 operator[](uint64_t location) {
-		return Complex32(r.c[location], c.c[location]);
+		return Complex32(r.c[location], i.c[location]);
 	}
 
 	inline void set(uint64_t location, Complex32 value) {
 		r.c[location] = value.c.c[0];
-		c.c[location] = value.c.c[1];
+		i.c[location] = value.c.c[1];
 	}
 
 	inline Array2Complex32 *add(Array2Complex32 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		return this;
 	}
 
 	inline Array2Complex32 *add(Complex32 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		return this;
 	}
 
 	inline void operator+=(Array2Complex32 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 	}
 
 	inline void operator+=(Complex32 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 	}
@@ -8786,8 +9013,8 @@ public:
 
 	inline Array2Complex32 operator+(Array2Complex32 a) const {
 		Array2Complex32 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[0];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.i.c[0] = i.c[0] + a.i.c[0];
+		ret.i.c[1] = i.c[1] + a.i.c[1];
 		ret.r.c[0] = r.c[0] + a.r.c[0];
 		ret.r.c[1] = r.c[1] + a.r.c[1];
 		return ret;
@@ -8795,8 +9022,8 @@ public:
 
 	inline Array2Complex32 operator+(Complex32 a) const {
 		Array2Complex32 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[1];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
+		ret.i.c[0] = i.c[0] + a.c.c[1];
+		ret.i.c[1] = i.c[1] + a.c.c[1];
 		ret.r.c[0] = r.c[0] + a.c.c[0];
 		ret.r.c[1] = r.c[1] + a.c.c[0];
 		return ret;
@@ -8804,11 +9031,11 @@ public:
 
 	inline Array2Complex32 *add(Array2Complex32 a, VectorU8_2D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[0];
+			i.c[0] += a.i.c[0];
 			r.c[0] += a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.i.c[1];
 			r.c[1] += a.r.c[1];
 		}
 		return this;
@@ -8816,11 +9043,11 @@ public:
 
 	inline Array2Complex32 *add(Complex32 a, VectorU8_2D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[1];
+			i.c[0] += a.c.c[1];
 			r.c[0] += a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.c.c[1];
 			r.c[1] += a.c.c[0];
 		}
 		return this;
@@ -8828,39 +9055,39 @@ public:
 
 
 	inline Array2Complex32 *subtract(Array2Complex32 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		return this;
 	}
 
 	inline Array2Complex32 *subtract(Complex32 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		return this;
 	}
 
 	inline void operator-=(Array2Complex32 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 	}
 
 	inline void operator-=(Complex32 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 	}
 
 	inline Array2Complex32 operator-(Array2Complex32 a) const {
 		Array2Complex32 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[0];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.i.c[0] = i.c[0] - a.i.c[0];
+		ret.i.c[1] = i.c[1] - a.i.c[1];
 		ret.r.c[0] = r.c[0] - a.r.c[0];
 		ret.r.c[1] = r.c[1] - a.r.c[1];
 		return ret;
@@ -8868,8 +9095,8 @@ public:
 
 	inline Array2Complex32 operator-(Complex32 a) const {
 		Array2Complex32 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[1];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
+		ret.i.c[0] = i.c[0] - a.c.c[1];
+		ret.i.c[1] = i.c[1] - a.c.c[1];
 		ret.r.c[0] = r.c[0] - a.c.c[0];
 		ret.r.c[1] = r.c[1] - a.c.c[0];
 		return ret;
@@ -8877,11 +9104,11 @@ public:
 
 	inline Array2Complex32 *subtract(Array2Complex32 a, VectorU8_2D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[0];
+			i.c[0] -= a.i.c[0];
 			r.c[0] -= a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.i.c[1];
 			r.c[1] -= a.r.c[1];
 		}
 		return this;
@@ -8889,11 +9116,11 @@ public:
 
 	inline Array2Complex32 *subtract(Complex32 a, VectorU8_2D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[1];
+			i.c[0] -= a.c.c[1];
 			r.c[0] -= a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.c.c[1];
 			r.c[1] -= a.c.c[0];
 		}
 		return this;
@@ -8902,10 +9129,10 @@ public:
 
 	inline Array2Complex32 operator*(const Array2Complex32 &a) const {
 		Array2Complex32 ret;
-		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		ret.r.c[0] = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		ret.i.c[0] = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		ret.i.c[1] = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 
 
 		return ret;
@@ -8914,24 +9141,24 @@ public:
 	inline Array2Complex32 *multiply(const Array2Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
 	inline Array2Complex32 operator*(const Complex32 &a) const {
 		Array2Complex32 ret;
-		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		ret.r.c[0] = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		ret.i.c[0] = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		ret.i.c[1] = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 
 		return ret;
 	}
@@ -8939,39 +9166,39 @@ public:
 	inline void operator*=(const Array2Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 	}
 
 	inline void operator*=(const Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 	}
 
 	inline Array2Complex32 *multiply(const Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -8979,16 +9206,16 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 
@@ -8999,16 +9226,16 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+			d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+			d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -9016,14 +9243,14 @@ public:
 	inline Array2Complex32 *square() {
 		float d1;
 		float d2;
-		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+		d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		i.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+		d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -9031,29 +9258,29 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+			d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+			d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex32 *divide(const Complex32 a) {
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -9061,29 +9288,29 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex32 *divide(const Array2Complex32 &a) {
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -9091,87 +9318,87 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.i.c[0] + i.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[0] * a.i.c[0] - r.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex32 operator/(const Complex32 &a) const {
 		Array2Complex32 ret;
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
+		ret.i.c[1] = d2;
 		return ret;
 	}
 
 	inline Array2Complex32 operator/(const Array2Complex32 &a) const {
 		Array2Complex32 ret;
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
+		ret.i.c[1] = d2;
 		return ret;
 	}
 
 	inline void operator/=(const Complex32 &a) {
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 	}
 
 	inline void operator/=(const Array2Complex32 &a) {
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 	}
 
 	inline Array2Complex32 *sqrt() {
 		float d1;
 		float d2;
-		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[0]);
 		} else LIKELY {
-			d1 = c.c[0] / (2 * d2);
+			d1 = i.c[0] / (2 * d2);
 		}
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		i.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[1]);
 		} else LIKELY {
-			d1 = c.c[1] / (2 * d2);
+			d1 = i.c[1] / (2 * d2);
 		}
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -9179,24 +9406,24 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[0]);
 			} else LIKELY {
-				d1 = c.c[0] / (2 * d2);
+				d1 = i.c[0] / (2 * d2);
 			}
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[1]);
 			} else LIKELY {
-				d1 = c.c[1] / (2 * d2);
+				d1 = i.c[1] / (2 * d2);
 			}
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -9204,42 +9431,42 @@ public:
 	inline Array2Complex32 *sin() {
 		float d1;
 		float d2;
-		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+		d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+		d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
 	inline Array2Complex32 *cos() {
 		float d1;
 		float d2;
-		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+		d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+		d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
 	inline Array2Complex32 *tan() {
 		float d1;
 		float d2;
-		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+		d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+		d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -9247,16 +9474,16 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+			d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+			d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -9265,16 +9492,16 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+			d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+			d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -9283,41 +9510,41 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+			d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+			d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex32 *exp() {
-		float d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-		float d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		float d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+		float d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		i.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
 	inline Array2Complex32 *exp(float n) {
-		float d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-		float d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		float d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+		float d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		i.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -9325,16 +9552,16 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
@@ -9343,57 +9570,57 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline Array2Complex32 *pow(Array2Complex32 n) {
-		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		float d2 = ::atan2(r.c[0], c.c[0]);
-		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-		float d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		float d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], i.c[0]);
+		float d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+		float d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 		float d5 = d3 * ::cos(d4);
 		float d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
 		return this;
 	}
 
 
 	inline Array2Complex32 *pow(Complex32 n) {
-		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], i.c[0]);
 		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		float d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		float d5 = d3 * ::cos(d4);
 		float d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
 		return this;
 	}
@@ -9406,23 +9633,23 @@ public:
 		float d5;
 		float d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		return this;
@@ -9437,23 +9664,23 @@ public:
 		float d5;
 		float d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		return this;
@@ -9463,14 +9690,14 @@ public:
 	inline Array2Complex32 *pow(float n) {
 		float d1;
 		float d2;
-		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		i.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
+		i.c[1] = d2;
 		return this;
 	}
 
@@ -9478,45 +9705,45 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		return this;
 	}
 
 	inline VectorFloat2D abs() {
 		VectorFloat2D ret;
-		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
-		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1]);
 		return ret;
 	}
 
 	inline VectorU8_2D abs_gt(float a) {
 		VectorU8_2D ret;
-		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + i.c[1] * i.c[1];
 		return ret;
 	}
 
 	inline VectorU8_2D abs_lt(float a) {
 		VectorU8_2D ret;
-		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + i.c[1] * i.c[1];
 		return ret;
 	}
 
 	inline VectorU8_2D abs_eq(float a) {
 		VectorU8_2D ret;
-		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + i.c[1] * i.c[1];
 		return ret;
 	}
 
@@ -9524,15 +9751,15 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		return this;
@@ -9542,15 +9769,15 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		return this;
@@ -9560,15 +9787,15 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		return this;
@@ -9577,13 +9804,13 @@ public:
 	inline Array2Complex32 *ln() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
 		return this;
 	}
@@ -9591,13 +9818,13 @@ public:
 	inline Array2Complex32 *log() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
 		return this;
 	}
@@ -9605,13 +9832,13 @@ public:
 	inline Array2Complex32 *log10() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+		i.c[1] = d1;
 		r.c[1] = d2;
 		return this;
 	}
@@ -9619,13 +9846,13 @@ public:
 
 inline std::string operator<<(std::string &lhs, const Array2Complex32 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1] << "i }";
 	return string.str();
 }
 
 inline std::string operator<<(const char *lhs, const Array2Complex32 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1] << "i }";
 	return string.str();
 }
 
@@ -9636,7 +9863,7 @@ operator<<(std::basic_ostream<charT, traits> &o, const Array2Complex32 &rhs) {
 	s.flags(o.flags());
 	s.imbue(o.getloc());
 	s.precision(o.precision());
-	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1] << "i }";
+	s << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1] << "i }";
 	return o << s.str();
 }
 
@@ -9647,8 +9874,8 @@ inline Array2Complex32 operator+(const Complex32 &lhs, const Array2Complex32 &rh
 
 inline Array2Complex32 operator-(const Complex32 &lhs, const Array2Complex32 &rhs) {
 	Array2Complex32 ret;
-	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
-	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
+	ret.i.c[0] = lhs.c.c[1] - rhs.i.c[0];
+	ret.i.c[1] = lhs.c.c[1] - rhs.i.c[1];
 	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
 	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
 	return ret;
@@ -9661,15 +9888,15 @@ inline Array2Complex32 operator*(const Complex32 &lhs, const Array2Complex32 &rh
 inline Array2Complex32 operator/(const Complex32 &lhs, const Array2Complex32 &rhs) {
 	Array2Complex32 ret;
 	float d1 =
-			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	float d2 =
-			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	ret.r.c[0] = d1;
-	ret.c.c[0] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
-	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.i.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
 	ret.r.c[1] = d1;
-	ret.c.c[1] = d2;
+	ret.i.c[1] = d2;
 	return ret;
 }
 
@@ -9677,19 +9904,19 @@ inline Array2Complex32 operator/(const Complex32 &lhs, const Array2Complex32 &rh
 class Array4Complex32 {
 public:
 	floatvec4 r{};
-	floatvec4 c{};
+	floatvec4 i{};
 
 	inline Array4Complex32() {}
 
 	inline Array4Complex32(Complex32 value) {
 		r.c[0] = value.c.c[0];
-		c.c[0] = value.c.c[1];
+		i.c[0] = value.c.c[1];
 		r.c[1] = value.c.c[0];
-		c.c[1] = value.c.c[1];
+		i.c[1] = value.c.c[1];
 		r.c[2] = value.c.c[0];
-		c.c[2] = value.c.c[1];
+		i.c[2] = value.c.c[1];
 		r.c[3] = value.c.c[0];
-		c.c[3] = value.c.c[1];
+		i.c[3] = value.c.c[1];
 	}
 
 
@@ -9698,23 +9925,23 @@ public:
 	}
 
 	inline VectorFloat4D complex() {
-		return VectorFloat4D(c.c);
+		return VectorFloat4D(i.c);
 	}
 
 	inline Complex32 operator[](uint64_t location) {
-		return Complex32(r.c[location], c.c[location]);
+		return Complex32(r.c[location], i.c[location]);
 	}
 
 	inline void set(uint64_t location, Complex32 value) {
 		r.c[location] = value.c.c[0];
-		c.c[location] = value.c.c[1];
+		i.c[location] = value.c.c[1];
 	}
 
 	inline Array4Complex32 *add(Array4Complex32 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[2];
-		c.c[3] += a.c.c[3];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
+		i.c[2] += a.i.c[2];
+		i.c[3] += a.i.c[3];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
@@ -9723,10 +9950,10 @@ public:
 	}
 
 	inline Array4Complex32 *add(Complex32 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[1];
-		c.c[3] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
+		i.c[2] += a.c.c[1];
+		i.c[3] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
@@ -9735,10 +9962,10 @@ public:
 	}
 
 	inline void operator+=(Array4Complex32 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[2];
-		c.c[3] += a.c.c[3];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
+		i.c[2] += a.i.c[2];
+		i.c[3] += a.i.c[3];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
@@ -9746,10 +9973,10 @@ public:
 	}
 
 	inline void operator+=(Complex32 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[1];
-		c.c[3] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
+		i.c[2] += a.c.c[1];
+		i.c[3] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
@@ -9759,10 +9986,10 @@ public:
 
 	inline Array4Complex32 operator+(Array4Complex32 a) const {
 		Array4Complex32 ret{};
-		ret.c.c[0] = c.c[0] + a.c.c[0];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.c.c[2] = c.c[2] + a.c.c[2];
-		ret.c.c[3] = c.c[3] + a.c.c[3];
+		ret.i.c[0] = i.c[0] + a.i.c[0];
+		ret.i.c[1] = i.c[1] + a.i.c[1];
+		ret.i.c[2] = i.c[2] + a.i.c[2];
+		ret.i.c[3] = i.c[3] + a.i.c[3];
 		ret.r.c[0] = r.c[0] + a.r.c[0];
 		ret.r.c[1] = r.c[1] + a.r.c[1];
 		ret.r.c[2] = r.c[2] + a.r.c[2];
@@ -9772,10 +9999,10 @@ public:
 
 	inline Array4Complex32 operator+(Complex32 a) const {
 		Array4Complex32 ret{};
-		ret.c.c[0] = c.c[0] + a.c.c[1];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.c.c[2] = c.c[2] + a.c.c[1];
-		ret.c.c[3] = c.c[3] + a.c.c[1];
+		ret.i.c[0] = i.c[0] + a.c.c[1];
+		ret.i.c[1] = i.c[1] + a.c.c[1];
+		ret.i.c[2] = i.c[2] + a.c.c[1];
+		ret.i.c[3] = i.c[3] + a.c.c[1];
 		ret.r.c[0] = r.c[0] + a.c.c[0];
 		ret.r.c[1] = r.c[1] + a.c.c[0];
 		ret.r.c[2] = r.c[2] + a.c.c[0];
@@ -9785,19 +10012,19 @@ public:
 
 	inline Array4Complex32 *add(Array4Complex32 a, VectorU8_4D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[0];
+			i.c[0] += a.i.c[0];
 			r.c[0] += a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.i.c[1];
 			r.c[1] += a.r.c[1];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] += a.c.c[2];
+			i.c[2] += a.i.c[2];
 			r.c[2] += a.r.c[2];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] += a.c.c[3];
+			i.c[3] += a.i.c[3];
 			r.c[3] += a.r.c[3];
 		}
 		return this;
@@ -9805,19 +10032,19 @@ public:
 
 	inline Array4Complex32 *add(Complex32 a, VectorU8_4D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[1];
+			i.c[0] += a.c.c[1];
 			r.c[0] += a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.c.c[1];
 			r.c[1] += a.c.c[0];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] += a.c.c[1];
+			i.c[2] += a.c.c[1];
 			r.c[2] += a.c.c[0];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] += a.c.c[1];
+			i.c[3] += a.c.c[1];
 			r.c[3] += a.c.c[0];
 		}
 		return this;
@@ -9825,10 +10052,10 @@ public:
 
 
 	inline Array4Complex32 *subtract(Array4Complex32 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[2];
-		c.c[3] -= a.c.c[3];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
+		i.c[2] -= a.i.c[2];
+		i.c[3] -= a.i.c[3];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
@@ -9837,10 +10064,10 @@ public:
 	}
 
 	inline Array4Complex32 *subtract(Complex32 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[1];
-		c.c[3] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
+		i.c[2] -= a.c.c[1];
+		i.c[3] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
@@ -9849,10 +10076,10 @@ public:
 	}
 
 	inline void operator-=(Array4Complex32 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[2];
-		c.c[3] -= a.c.c[3];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
+		i.c[2] -= a.i.c[2];
+		i.c[3] -= a.i.c[3];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
@@ -9860,10 +10087,10 @@ public:
 	}
 
 	inline void operator-=(Complex32 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[1];
-		c.c[3] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
+		i.c[2] -= a.c.c[1];
+		i.c[3] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
@@ -9872,10 +10099,10 @@ public:
 
 	inline Array4Complex32 operator-(Array4Complex32 a) const {
 		Array4Complex32 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[0];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
-		ret.c.c[2] = c.c[2] - a.c.c[2];
-		ret.c.c[3] = c.c[3] - a.c.c[3];
+		ret.i.c[0] = i.c[0] - a.i.c[0];
+		ret.i.c[1] = i.c[1] - a.i.c[1];
+		ret.i.c[2] = i.c[2] - a.i.c[2];
+		ret.i.c[3] = i.c[3] - a.i.c[3];
 		ret.r.c[0] = r.c[0] - a.r.c[0];
 		ret.r.c[1] = r.c[1] - a.r.c[1];
 		ret.r.c[2] = r.c[2] - a.r.c[2];
@@ -9885,10 +10112,10 @@ public:
 
 	inline Array4Complex32 operator-(Complex32 a) const {
 		Array4Complex32 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[1];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
-		ret.c.c[2] = c.c[2] - a.c.c[1];
-		ret.c.c[3] = c.c[3] - a.c.c[1];
+		ret.i.c[0] = i.c[0] - a.c.c[1];
+		ret.i.c[1] = i.c[1] - a.c.c[1];
+		ret.i.c[2] = i.c[2] - a.c.c[1];
+		ret.i.c[3] = i.c[3] - a.c.c[1];
 		ret.r.c[0] = r.c[0] - a.c.c[0];
 		ret.r.c[1] = r.c[1] - a.c.c[0];
 		ret.r.c[2] = r.c[2] - a.c.c[0];
@@ -9898,19 +10125,19 @@ public:
 
 	inline Array4Complex32 *subtract(Array4Complex32 a, VectorU8_4D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[0];
+			i.c[0] -= a.i.c[0];
 			r.c[0] -= a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.i.c[1];
 			r.c[1] -= a.r.c[1];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] -= a.c.c[2];
+			i.c[2] -= a.i.c[2];
 			r.c[2] -= a.r.c[2];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] -= a.c.c[3];
+			i.c[3] -= a.i.c[3];
 			r.c[3] -= a.r.c[3];
 		}
 		return this;
@@ -9918,19 +10145,19 @@ public:
 
 	inline Array4Complex32 *subtract(Complex32 a, VectorU8_4D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[1];
+			i.c[0] -= a.c.c[1];
 			r.c[0] -= a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.c.c[1];
 			r.c[1] -= a.c.c[0];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] -= a.c.c[1];
+			i.c[2] -= a.c.c[1];
 			r.c[2] -= a.c.c[0];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] -= a.c.c[1];
+			i.c[3] -= a.c.c[1];
 			r.c[3] -= a.c.c[0];
 		}
 		return this;
@@ -9939,14 +10166,14 @@ public:
 
 	inline Array4Complex32 operator*(const Array4Complex32 &a) const {
 		Array4Complex32 ret;
-		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
-		ret.r.c[2] = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		ret.c.c[2] = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
-		ret.r.c[3] = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		ret.c.c[3] = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		ret.r.c[0] = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		ret.i.c[0] = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		ret.i.c[1] = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
+		ret.r.c[2] = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		ret.i.c[2] = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
+		ret.r.c[3] = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		ret.i.c[3] = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 
 
 		return ret;
@@ -9955,36 +10182,36 @@ public:
 	inline Array4Complex32 *multiply(const Array4Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
 	inline Array4Complex32 operator*(const Complex32 &a) const {
 		Array4Complex32 ret;
-		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
-		ret.r.c[2] = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		ret.c.c[2] = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
-		ret.r.c[3] = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		ret.c.c[3] = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		ret.r.c[0] = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		ret.i.c[0] = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		ret.i.c[1] = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
+		ret.r.c[2] = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		ret.i.c[2] = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
+		ret.r.c[3] = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		ret.i.c[3] = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 
 
 		return ret;
@@ -9993,65 +10220,65 @@ public:
 	inline void operator*=(const Array4Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 	}
 
 	inline void operator*=(const Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 	}
 
 	inline Array4Complex32 *multiply(const Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -10059,28 +10286,28 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-			d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+			d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+			d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-			d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+			d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+			d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 
@@ -10091,28 +10318,28 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+			d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+			d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-			d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+			d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+			d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-			d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+			d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+			d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -10120,22 +10347,22 @@ public:
 	inline Array4Complex32 *square() {
 		float d1;
 		float d2;
-		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+		d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		i.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+		d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
-		d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * r.c[2] - i.c[2] * i.c[2];
+		d2 = r.c[2] * i.c[2] + i.c[2] * r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
-		d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * r.c[3] - i.c[3] * i.c[3];
+		d2 = r.c[3] * i.c[3] + i.c[3] * r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -10143,49 +10370,49 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+			d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+			d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
-			d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+			d1 = r.c[2] * r.c[2] - i.c[2] * i.c[2];
+			d2 = r.c[2] * i.c[2] + i.c[2] * r.c[2];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
-			d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+			d1 = r.c[3] * r.c[3] - i.c[3] * i.c[3];
+			d2 = r.c[3] * i.c[3] + i.c[3] * r.c[3];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline Array4Complex32 *divide(const Complex32 a) {
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -10193,49 +10420,49 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline Array4Complex32 *divide(const Array4Complex32 &a) {
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -10243,144 +10470,144 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.i.c[0] + i.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[0] * a.i.c[0] - r.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-			d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+			d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-			d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+			d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline Array4Complex32 operator/(const Complex32 &a) const {
 		Array4Complex32 ret;
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[2] = d1;
-		ret.c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[3] = d1;
-		ret.c.c[3] = d2;
+		ret.i.c[3] = d2;
 		return ret;
 	}
 
 	inline Array4Complex32 operator/(const Array4Complex32 &a) const {
 		Array4Complex32 ret;
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		ret.i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		ret.r.c[2] = d1;
-		ret.c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		ret.i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		ret.r.c[3] = d1;
-		ret.c.c[3] = d2;
+		ret.i.c[3] = d2;
 		return ret;
 	}
 
 	inline void operator/=(const Complex32 &a) {
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 	}
 
 	inline void operator/=(const Array4Complex32 &a) {
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 	}
 
 	inline Array4Complex32 *sqrt() {
 		float d1;
 		float d2;
-		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[0]);
 		} else LIKELY {
-			d1 = c.c[0] / (2 * d2);
+			d1 = i.c[0] / (2 * d2);
 		}
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		i.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[1]);
 		} else LIKELY {
-			d1 = c.c[1] / (2 * d2);
+			d1 = i.c[1] / (2 * d2);
 		}
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+		i.c[1] = d2;
+		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[2]);
 		} else LIKELY {
-			d1 = c.c[2] / (2 * d2);
+			d1 = i.c[2] / (2 * d2);
 		}
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+		i.c[2] = d2;
+		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[3]);
 		} else LIKELY {
-			d1 = c.c[3] / (2 * d2);
+			d1 = i.c[3] / (2 * d2);
 		}
 		return this;
 	}
@@ -10389,44 +10616,44 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[0]);
 			} else LIKELY {
-				d1 = c.c[0] / (2 * d2);
+				d1 = i.c[0] / (2 * d2);
 			}
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[1]);
 			} else LIKELY {
-				d1 = c.c[1] / (2 * d2);
+				d1 = i.c[1] / (2 * d2);
 			}
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[2]);
 			} else LIKELY {
-				d1 = c.c[2] / (2 * d2);
+				d1 = i.c[2] / (2 * d2);
 			}
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[3]);
 			} else LIKELY {
-				d1 = c.c[3] / (2 * d2);
+				d1 = i.c[3] / (2 * d2);
 			}
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -10434,66 +10661,66 @@ public:
 	inline Array4Complex32 *sin() {
 		float d1;
 		float d2;
-		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+		d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+		d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
-		d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+		i.c[1] = d2;
+		d1 = ::sin(r.c[2]) * ::cosh(i.c[2]);
+		d2 = ::cos(i.c[2]) * ::sinh(r.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
-		d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+		i.c[2] = d2;
+		d1 = ::sin(r.c[3]) * ::cosh(i.c[3]);
+		d2 = ::cos(i.c[3]) * ::sinh(r.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
 	inline Array4Complex32 *cos() {
 		float d1;
 		float d2;
-		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+		d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+		d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
-		d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+		i.c[1] = d2;
+		d1 = ::cos(r.c[2]) * ::cosh(i.c[2]);
+		d2 = -::sin(i.c[2]) * ::sinh(r.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
-		d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+		i.c[2] = d2;
+		d1 = ::cos(r.c[3]) * ::cosh(i.c[3]);
+		d2 = -::sin(i.c[3]) * ::sinh(r.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
 	inline Array4Complex32 *tan() {
 		float d1;
 		float d2;
-		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+		d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+		d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
-		d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		i.c[1] = d2;
+		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
+		d2 = ::sinh(i.c[2] + i.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
-		d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		i.c[2] = d2;
+		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
+		d2 = ::sinh(i.c[3] + i.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -10501,28 +10728,28 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+			d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+			d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
-			d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+			d1 = ::sin(r.c[2]) * ::cosh(i.c[2]);
+			d2 = ::cos(i.c[2]) * ::sinh(r.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
-			d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+			d1 = ::sin(r.c[3]) * ::cosh(i.c[3]);
+			d2 = ::cos(i.c[3]) * ::sinh(r.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -10531,28 +10758,28 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+			d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+			d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
-			d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+			d1 = ::cos(r.c[2]) * ::cosh(i.c[2]);
+			d2 = -::sin(i.c[2]) * ::sinh(r.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
-			d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+			d1 = ::cos(r.c[3]) * ::cosh(i.c[3]);
+			d2 = -::sin(i.c[3]) * ::sinh(r.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -10561,70 +10788,70 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+			d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+			d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
-			d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
+			d2 = ::sinh(i.c[2] + i.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
-			d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
+			d2 = ::sinh(i.c[3] + i.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 
 	inline Array4Complex32 *exp() {
-		float d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-		float d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		float d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+		float d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		i.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
-		d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+		i.c[1] = d2;
+		d1 = ::exp(r.c[2]) * ::cos(i.c[2]);
+		d2 = ::exp(r.c[2]) * ::sin(i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
-		d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+		i.c[2] = d2;
+		d1 = ::exp(r.c[3]) * ::cos(i.c[3]);
+		d2 = ::exp(r.c[3]) * ::sin(i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
 	inline Array4Complex32 *exp(float n) {
-		float d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-		float d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		float d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+		float d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		i.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
-		d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+		i.c[1] = d2;
+		d1 = ::pow(n, r.c[2]) * ::cos(i.c[2] * ::log(n));
+		d2 = ::pow(n, r.c[2]) * ::sin(i.c[2] * ::log(n));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
-		d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+		i.c[2] = d2;
+		d1 = ::pow(n, r.c[3]) * ::cos(i.c[3] * ::log(n));
+		d2 = ::pow(n, r.c[3]) * ::sin(i.c[3] * ::log(n));
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 		return this;
 	}
 
@@ -10632,101 +10859,101 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
-			d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+			d1 = ::exp(r.c[2]) * ::cos(i.c[2]);
+			d2 = ::exp(r.c[2]) * ::sin(i.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
-			d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+			d1 = ::exp(r.c[3]) * ::cos(i.c[3]);
+			d2 = ::exp(r.c[3]) * ::sin(i.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline Array4Complex32 *pow(Array4Complex32 n) {
-		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		float d2 = ::atan2(r.c[0], c.c[0]);
-		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-		float d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		float d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], i.c[0]);
+		float d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+		float d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 		float d5 = d3 * ::cos(d4);
 		float d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
-		d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		d3 = ::exp(d1 * n.i.c[2] - d2 * n.r.c[2]);
+		d4 = d1 * n.r.c[2] + d2 * n.i.c[2];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[2] = d5;
+		i.c[2] = d5;
 		r.c[2] = d6;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
-		d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		d3 = ::exp(d1 * n.i.c[3] - d2 * n.r.c[3]);
+		d4 = d1 * n.r.c[3] + d2 * n.i.c[3];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[3] = d5;
+		i.c[3] = d5;
 		r.c[3] = d6;
 		return this;
 	}
 
 
 	inline Array4Complex32 *pow(Complex32 n) {
-		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], i.c[0]);
 		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		float d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		float d5 = d3 * ::cos(d4);
 		float d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[2] = d5;
+		i.c[2] = d5;
 		r.c[2] = d6;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[3] = d5;
+		i.c[3] = d5;
 		r.c[3] = d6;
 		return this;
 	}
@@ -10739,43 +10966,43 @@ public:
 		float d5;
 		float d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
-			d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			d3 = ::exp(d1 * n.i.c[2] - d2 * n.r.c[2]);
+			d4 = d1 * n.r.c[2] + d2 * n.i.c[2];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[2] = d5;
+			i.c[2] = d5;
 			r.c[2] = d6;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
-			d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			d3 = ::exp(d1 * n.i.c[3] - d2 * n.r.c[3]);
+			d4 = d1 * n.r.c[3] + d2 * n.i.c[3];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[3] = d5;
+			i.c[3] = d5;
 			r.c[3] = d6;
 		}
 		return this;
@@ -10790,43 +11017,43 @@ public:
 		float d5;
 		float d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[2] = d5;
+			i.c[2] = d5;
 			r.c[2] = d6;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[3] = d5;
+			i.c[3] = d5;
 			r.c[3] = d6;
 		}
 		return this;
@@ -10836,28 +11063,28 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
-			d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+			d1 = ::pow(n, r.c[2]) * ::cos(i.c[2] * ::log(n));
+			d2 = ::pow(n, r.c[2]) * ::sin(i.c[2] * ::log(n));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
-			d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+			d1 = ::pow(n, r.c[3]) * ::cos(i.c[3] * ::log(n));
+			d2 = ::pow(n, r.c[3]) * ::sin(i.c[3] * ::log(n));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
@@ -10865,22 +11092,22 @@ public:
 	inline Array4Complex32 *pow(float n) {
 		float d1;
 		float d2;
-		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		i.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
-		d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+		i.c[1] = d2;
+		d1 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::cos(n * atan2(i.c[2], r.c[2]));
+		d2 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::sin(n * atan2(i.c[2], r.c[2]));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
-		d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+		i.c[2] = d2;
+		d1 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::cos(n * atan2(i.c[3], r.c[3]));
+		d2 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::sin(n * atan2(i.c[3], r.c[3]));
 		r.c[3] = d1;
-		c.c[3] = d2;
+		i.c[3] = d2;
 
 		return this;
 	}
@@ -10889,65 +11116,65 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
-			d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+			d1 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::cos(n * atan2(i.c[2], r.c[2]));
+			d2 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::sin(n * atan2(i.c[2], r.c[2]));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
-			d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+			d1 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::cos(n * atan2(i.c[3], r.c[3]));
+			d2 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::sin(n * atan2(i.c[3], r.c[3]));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		return this;
 	}
 
 	inline VectorFloat4D abs() {
 		VectorFloat4D ret;
-		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
-		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
-		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2]);
-		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3]);
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1]);
+		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2]);
+		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3]);
 		return ret;
 	}
 
 	inline VectorU8_4D abs_gt(float a) {
 		VectorU8_4D ret;
-		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a < r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a < r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a < r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a < r.c[3] * r.c[3] + i.c[3] * i.c[3];
 		return ret;
 	}
 
 	inline VectorU8_4D abs_lt(float a) {
 		VectorU8_4D ret;
-		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a > r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a > r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a > r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a > r.c[3] * r.c[3] + i.c[3] * i.c[3];
 		return ret;
 	}
 
 	inline VectorU8_4D abs_eq(float a) {
 		VectorU8_4D ret;
-		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a == r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a == r.c[3] * r.c[3] + c.c[3] * c.c[3];
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a == r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a == r.c[3] * r.c[3] + i.c[3] * i.c[3];
 		return ret;
 	}
 
@@ -10955,27 +11182,27 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		return this;
@@ -10985,27 +11212,27 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		return this;
@@ -11015,27 +11242,27 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[2], i.c[2]) / AML_LN10;
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[3], i.c[3]) / AML_LN10;
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		return this;
@@ -11044,21 +11271,21 @@ public:
 	inline Array4Complex32 *ln() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		i.c[3] = d1;
 		r.c[3] = d2;
 		return this;
 	}
@@ -11066,21 +11293,21 @@ public:
 	inline Array4Complex32 *log() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		i.c[3] = d1;
 		r.c[3] = d2;
 		return this;
 	}
@@ -11088,21 +11315,21 @@ public:
 	inline Array4Complex32 *log10() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[2], i.c[2]) / AML_LN10;
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[3], i.c[3]) / AML_LN10;
+		i.c[3] = d1;
 		r.c[3] = d2;
 		return this;
 	}
@@ -11111,15 +11338,15 @@ public:
 
 inline std::string operator<<(std::string &lhs, const Array4Complex32 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i }";
 	return string.str();
 }
 
 inline std::string operator<<(const char *lhs, const Array4Complex32 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i }";
 	return string.str();
 }
 
@@ -11130,8 +11357,8 @@ operator<<(std::basic_ostream<charT, traits> &o, const Array4Complex32 &rhs) {
 	s.flags(o.flags());
 	s.imbue(o.getloc());
 	s.precision(o.precision());
-	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-	  << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i }";
+	s << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+	  << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i }";
 	return o << s.str();
 }
 
@@ -11142,10 +11369,10 @@ inline Array4Complex32 operator+(const Complex32 &lhs, const Array4Complex32 &rh
 
 inline Array4Complex32 operator-(const Complex32 &lhs, const Array4Complex32 &rhs) {
 	Array4Complex32 ret;
-	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
-	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
-	ret.c.c[2] = lhs.c.c[1] - rhs.c.c[2];
-	ret.c.c[3] = lhs.c.c[1] - rhs.c.c[3];
+	ret.i.c[0] = lhs.c.c[1] - rhs.i.c[0];
+	ret.i.c[1] = lhs.c.c[1] - rhs.i.c[1];
+	ret.i.c[2] = lhs.c.c[1] - rhs.i.c[2];
+	ret.i.c[3] = lhs.c.c[1] - rhs.i.c[3];
 	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
 	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
 	ret.r.c[2] = lhs.c.c[0] - rhs.r.c[2];
@@ -11160,23 +11387,23 @@ inline Array4Complex32 operator*(const Complex32 &lhs, const Array4Complex32 &rh
 inline Array4Complex32 operator/(const Complex32 &lhs, const Array4Complex32 &rhs) {
 	Array4Complex32 ret;
 	float d1 =
-			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	float d2 =
-			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	ret.r.c[0] = d1;
-	ret.c.c[0] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
-	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.i.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
 	ret.r.c[1] = d1;
-	ret.c.c[1] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
-	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	ret.i.c[1] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.i.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.i.c[2] * rhs.i.c[2]);
+	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.i.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.i.c[2] * rhs.i.c[2]);
 	ret.r.c[2] = d1;
-	ret.c.c[2] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
-	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	ret.i.c[2] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.i.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.i.c[3] * rhs.i.c[3]);
+	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.i.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.i.c[3] * rhs.i.c[3]);
 	ret.r.c[3] = d1;
-	ret.c.c[3] = d2;
+	ret.i.c[3] = d2;
 	return ret;
 }
 
@@ -11184,27 +11411,27 @@ inline Array4Complex32 operator/(const Complex32 &lhs, const Array4Complex32 &rh
 class Array8Complex32 {
 public:
 	floatvec8 r{};
-	floatvec8 c{};
+	floatvec8 i{};
 
 	inline Array8Complex32() {}
 
 	inline Array8Complex32(Complex32 value) {
 		r.c[0] = value.c.c[0];
-		c.c[0] = value.c.c[1];
+		i.c[0] = value.c.c[1];
 		r.c[1] = value.c.c[0];
-		c.c[1] = value.c.c[1];
+		i.c[1] = value.c.c[1];
 		r.c[2] = value.c.c[0];
-		c.c[2] = value.c.c[1];
+		i.c[2] = value.c.c[1];
 		r.c[3] = value.c.c[0];
-		c.c[3] = value.c.c[1];
+		i.c[3] = value.c.c[1];
 		r.c[4] = value.c.c[0];
-		c.c[4] = value.c.c[1];
+		i.c[4] = value.c.c[1];
 		r.c[5] = value.c.c[0];
-		c.c[5] = value.c.c[1];
+		i.c[5] = value.c.c[1];
 		r.c[6] = value.c.c[0];
-		c.c[6] = value.c.c[1];
+		i.c[6] = value.c.c[1];
 		r.c[7] = value.c.c[0];
-		c.c[7] = value.c.c[1];
+		i.c[7] = value.c.c[1];
 	}
 
 	inline VectorFloat8D real() {
@@ -11212,27 +11439,27 @@ public:
 	}
 
 	inline VectorFloat8D complex() {
-		return VectorFloat8D(c.c);
+		return VectorFloat8D(i.c);
 	}
 
 	inline Complex32 operator[](uint64_t location) {
-		return Complex32(r.c[location], c.c[location]);
+		return Complex32(r.c[location], i.c[location]);
 	}
 
 	inline void set(uint64_t location, Complex32 value) {
 		r.c[location] = value.c.c[0];
-		c.c[location] = value.c.c[1];
+		i.c[location] = value.c.c[1];
 	}
 
 	inline Array8Complex32 *add(Array8Complex32 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[2];
-		c.c[3] += a.c.c[3];
-		c.c[4] += a.c.c[4];
-		c.c[5] += a.c.c[5];
-		c.c[6] += a.c.c[6];
-		c.c[7] += a.c.c[7];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
+		i.c[2] += a.i.c[2];
+		i.c[3] += a.i.c[3];
+		i.c[4] += a.i.c[4];
+		i.c[5] += a.i.c[5];
+		i.c[6] += a.i.c[6];
+		i.c[7] += a.i.c[7];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
@@ -11245,14 +11472,14 @@ public:
 	}
 
 	inline Array8Complex32 *add(Complex32 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[1];
-		c.c[3] += a.c.c[1];
-		c.c[4] += a.c.c[1];
-		c.c[5] += a.c.c[1];
-		c.c[6] += a.c.c[1];
-		c.c[7] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
+		i.c[2] += a.c.c[1];
+		i.c[3] += a.c.c[1];
+		i.c[4] += a.c.c[1];
+		i.c[5] += a.c.c[1];
+		i.c[6] += a.c.c[1];
+		i.c[7] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
@@ -11266,14 +11493,14 @@ public:
 
 
 	inline void operator+=(Array8Complex32 a) {
-		c.c[0] += a.c.c[0];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[2];
-		c.c[3] += a.c.c[3];
-		c.c[4] += a.c.c[4];
-		c.c[5] += a.c.c[5];
-		c.c[6] += a.c.c[6];
-		c.c[7] += a.c.c[7];
+		i.c[0] += a.i.c[0];
+		i.c[1] += a.i.c[1];
+		i.c[2] += a.i.c[2];
+		i.c[3] += a.i.c[3];
+		i.c[4] += a.i.c[4];
+		i.c[5] += a.i.c[5];
+		i.c[6] += a.i.c[6];
+		i.c[7] += a.i.c[7];
 		r.c[0] += a.r.c[0];
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
@@ -11285,14 +11512,14 @@ public:
 	}
 
 	inline void operator+=(Complex32 a) {
-		c.c[0] += a.c.c[1];
-		c.c[1] += a.c.c[1];
-		c.c[2] += a.c.c[1];
-		c.c[3] += a.c.c[1];
-		c.c[4] += a.c.c[1];
-		c.c[5] += a.c.c[1];
-		c.c[6] += a.c.c[1];
-		c.c[7] += a.c.c[1];
+		i.c[0] += a.c.c[1];
+		i.c[1] += a.c.c[1];
+		i.c[2] += a.c.c[1];
+		i.c[3] += a.c.c[1];
+		i.c[4] += a.c.c[1];
+		i.c[5] += a.c.c[1];
+		i.c[6] += a.c.c[1];
+		i.c[7] += a.c.c[1];
 		r.c[0] += a.c.c[0];
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
@@ -11305,14 +11532,14 @@ public:
 
 	inline Array8Complex32 operator+(Array8Complex32 a) const {
 		Array8Complex32 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[0];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.c.c[2] = c.c[2] + a.c.c[2];
-		ret.c.c[3] = c.c[3] + a.c.c[3];
-		ret.c.c[4] = c.c[4] + a.c.c[4];
-		ret.c.c[5] = c.c[5] + a.c.c[5];
-		ret.c.c[6] = c.c[6] + a.c.c[6];
-		ret.c.c[7] = c.c[7] + a.c.c[7];
+		ret.i.c[0] = i.c[0] + a.i.c[0];
+		ret.i.c[1] = i.c[1] + a.i.c[1];
+		ret.i.c[2] = i.c[2] + a.i.c[2];
+		ret.i.c[3] = i.c[3] + a.i.c[3];
+		ret.i.c[4] = i.c[4] + a.i.c[4];
+		ret.i.c[5] = i.c[5] + a.i.c[5];
+		ret.i.c[6] = i.c[6] + a.i.c[6];
+		ret.i.c[7] = i.c[7] + a.i.c[7];
 		ret.r.c[0] = r.c[0] + a.r.c[0];
 		ret.r.c[1] = r.c[1] + a.r.c[1];
 		ret.r.c[2] = r.c[2] + a.r.c[2];
@@ -11326,14 +11553,14 @@ public:
 
 	inline Array8Complex32 operator+(Complex32 a) const {
 		Array8Complex32 ret;
-		ret.c.c[0] = c.c[0] + a.c.c[1];
-		ret.c.c[1] = c.c[1] + a.c.c[1];
-		ret.c.c[2] = c.c[2] + a.c.c[1];
-		ret.c.c[3] = c.c[3] + a.c.c[1];
-		ret.c.c[4] = c.c[4] + a.c.c[1];
-		ret.c.c[5] = c.c[5] + a.c.c[1];
-		ret.c.c[6] = c.c[6] + a.c.c[1];
-		ret.c.c[7] = c.c[7] + a.c.c[1];
+		ret.i.c[0] = i.c[0] + a.c.c[1];
+		ret.i.c[1] = i.c[1] + a.c.c[1];
+		ret.i.c[2] = i.c[2] + a.c.c[1];
+		ret.i.c[3] = i.c[3] + a.c.c[1];
+		ret.i.c[4] = i.c[4] + a.c.c[1];
+		ret.i.c[5] = i.c[5] + a.c.c[1];
+		ret.i.c[6] = i.c[6] + a.c.c[1];
+		ret.i.c[7] = i.c[7] + a.c.c[1];
 		ret.r.c[0] = r.c[0] + a.c.c[0];
 		ret.r.c[1] = r.c[1] + a.c.c[0];
 		ret.r.c[2] = r.c[2] + a.c.c[0];
@@ -11347,35 +11574,35 @@ public:
 
 	inline Array8Complex32 *add(Array8Complex32 a, VectorU8_8D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[0];
+			i.c[0] += a.i.c[0];
 			r.c[0] += a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.i.c[1];
 			r.c[1] += a.r.c[1];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] += a.c.c[2];
+			i.c[2] += a.i.c[2];
 			r.c[2] += a.r.c[2];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] += a.c.c[3];
+			i.c[3] += a.i.c[3];
 			r.c[3] += a.r.c[3];
 		}
 		if (mask.v.c[4]) {
-			c.c[4] += a.c.c[4];
+			i.c[4] += a.i.c[4];
 			r.c[4] += a.r.c[4];
 		}
 		if (mask.v.c[5]) {
-			c.c[5] += a.c.c[5];
+			i.c[5] += a.i.c[5];
 			r.c[5] += a.r.c[5];
 		}
 		if (mask.v.c[6]) {
-			c.c[6] += a.c.c[6];
+			i.c[6] += a.i.c[6];
 			r.c[6] += a.r.c[6];
 		}
 		if (mask.v.c[7]) {
-			c.c[7] += a.c.c[7];
+			i.c[7] += a.i.c[7];
 			r.c[7] += a.r.c[7];
 		}
 		return this;
@@ -11383,49 +11610,49 @@ public:
 
 	inline Array8Complex32 *add(Complex32 a, VectorU8_8D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] += a.c.c[1];
+			i.c[0] += a.c.c[1];
 			r.c[0] += a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] += a.c.c[1];
+			i.c[1] += a.c.c[1];
 			r.c[1] += a.c.c[0];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] += a.c.c[1];
+			i.c[2] += a.c.c[1];
 			r.c[2] += a.c.c[0];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] += a.c.c[1];
+			i.c[3] += a.c.c[1];
 			r.c[3] += a.c.c[0];
 		}
 		if (mask.v.c[4]) {
-			c.c[4] += a.c.c[1];
+			i.c[4] += a.c.c[1];
 			r.c[4] += a.c.c[0];
 		}
 		if (mask.v.c[5]) {
-			c.c[5] += a.c.c[1];
+			i.c[5] += a.c.c[1];
 			r.c[5] += a.c.c[0];
 		}
 		if (mask.v.c[6]) {
-			c.c[6] += a.c.c[1];
+			i.c[6] += a.c.c[1];
 			r.c[6] += a.c.c[0];
 		}
 		if (mask.v.c[7]) {
-			c.c[7] += a.c.c[1];
+			i.c[7] += a.c.c[1];
 			r.c[7] += a.c.c[0];
 		}
 		return this;
 	}
 
 	inline Array8Complex32 *subtract(Array8Complex32 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[2];
-		c.c[3] -= a.c.c[3];
-		c.c[4] -= a.c.c[4];
-		c.c[5] -= a.c.c[5];
-		c.c[6] -= a.c.c[6];
-		c.c[7] -= a.c.c[7];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
+		i.c[2] -= a.i.c[2];
+		i.c[3] -= a.i.c[3];
+		i.c[4] -= a.i.c[4];
+		i.c[5] -= a.i.c[5];
+		i.c[6] -= a.i.c[6];
+		i.c[7] -= a.i.c[7];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
@@ -11438,14 +11665,14 @@ public:
 	}
 
 	inline Array8Complex32 *subtract(Complex32 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[1];
-		c.c[3] -= a.c.c[1];
-		c.c[4] -= a.c.c[1];
-		c.c[5] -= a.c.c[1];
-		c.c[6] -= a.c.c[1];
-		c.c[7] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
+		i.c[2] -= a.c.c[1];
+		i.c[3] -= a.c.c[1];
+		i.c[4] -= a.c.c[1];
+		i.c[5] -= a.c.c[1];
+		i.c[6] -= a.c.c[1];
+		i.c[7] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
@@ -11458,14 +11685,14 @@ public:
 	}
 
 	inline void operator-=(Array8Complex32 a) {
-		c.c[0] -= a.c.c[0];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[2];
-		c.c[3] -= a.c.c[3];
-		c.c[4] -= a.c.c[4];
-		c.c[5] -= a.c.c[5];
-		c.c[6] -= a.c.c[6];
-		c.c[7] -= a.c.c[7];
+		i.c[0] -= a.i.c[0];
+		i.c[1] -= a.i.c[1];
+		i.c[2] -= a.i.c[2];
+		i.c[3] -= a.i.c[3];
+		i.c[4] -= a.i.c[4];
+		i.c[5] -= a.i.c[5];
+		i.c[6] -= a.i.c[6];
+		i.c[7] -= a.i.c[7];
 		r.c[0] -= a.r.c[0];
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
@@ -11477,14 +11704,14 @@ public:
 	}
 
 	inline void operator-=(Complex32 a) {
-		c.c[0] -= a.c.c[1];
-		c.c[1] -= a.c.c[1];
-		c.c[2] -= a.c.c[1];
-		c.c[3] -= a.c.c[1];
-		c.c[4] -= a.c.c[1];
-		c.c[5] -= a.c.c[1];
-		c.c[6] -= a.c.c[1];
-		c.c[7] -= a.c.c[1];
+		i.c[0] -= a.c.c[1];
+		i.c[1] -= a.c.c[1];
+		i.c[2] -= a.c.c[1];
+		i.c[3] -= a.c.c[1];
+		i.c[4] -= a.c.c[1];
+		i.c[5] -= a.c.c[1];
+		i.c[6] -= a.c.c[1];
+		i.c[7] -= a.c.c[1];
 		r.c[0] -= a.c.c[0];
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
@@ -11497,14 +11724,14 @@ public:
 
 	inline Array8Complex32 operator-(Array8Complex32 a) const {
 		Array8Complex32 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[0];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
-		ret.c.c[2] = c.c[2] - a.c.c[2];
-		ret.c.c[3] = c.c[3] - a.c.c[3];
-		ret.c.c[4] = c.c[4] - a.c.c[4];
-		ret.c.c[5] = c.c[5] - a.c.c[5];
-		ret.c.c[6] = c.c[6] - a.c.c[6];
-		ret.c.c[7] = c.c[7] - a.c.c[7];
+		ret.i.c[0] = i.c[0] - a.i.c[0];
+		ret.i.c[1] = i.c[1] - a.i.c[1];
+		ret.i.c[2] = i.c[2] - a.i.c[2];
+		ret.i.c[3] = i.c[3] - a.i.c[3];
+		ret.i.c[4] = i.c[4] - a.i.c[4];
+		ret.i.c[5] = i.c[5] - a.i.c[5];
+		ret.i.c[6] = i.c[6] - a.i.c[6];
+		ret.i.c[7] = i.c[7] - a.i.c[7];
 		ret.r.c[0] = r.c[0] - a.r.c[0];
 		ret.r.c[1] = r.c[1] - a.r.c[1];
 		ret.r.c[2] = r.c[2] - a.r.c[2];
@@ -11518,14 +11745,14 @@ public:
 
 	inline Array8Complex32 operator-(Complex32 a) const {
 		Array8Complex32 ret;
-		ret.c.c[0] = c.c[0] - a.c.c[1];
-		ret.c.c[1] = c.c[1] - a.c.c[1];
-		ret.c.c[2] = c.c[2] - a.c.c[1];
-		ret.c.c[3] = c.c[3] - a.c.c[1];
-		ret.c.c[4] = c.c[4] - a.c.c[1];
-		ret.c.c[5] = c.c[5] - a.c.c[1];
-		ret.c.c[6] = c.c[6] - a.c.c[1];
-		ret.c.c[7] = c.c[7] - a.c.c[1];
+		ret.i.c[0] = i.c[0] - a.c.c[1];
+		ret.i.c[1] = i.c[1] - a.c.c[1];
+		ret.i.c[2] = i.c[2] - a.c.c[1];
+		ret.i.c[3] = i.c[3] - a.c.c[1];
+		ret.i.c[4] = i.c[4] - a.c.c[1];
+		ret.i.c[5] = i.c[5] - a.c.c[1];
+		ret.i.c[6] = i.c[6] - a.c.c[1];
+		ret.i.c[7] = i.c[7] - a.c.c[1];
 		ret.r.c[0] = r.c[0] - a.c.c[0];
 		ret.r.c[1] = r.c[1] - a.c.c[0];
 		ret.r.c[2] = r.c[2] - a.c.c[0];
@@ -11539,35 +11766,35 @@ public:
 
 	inline Array8Complex32 *subtract(Array8Complex32 a, VectorU8_8D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[0];
+			i.c[0] -= a.i.c[0];
 			r.c[0] -= a.r.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.i.c[1];
 			r.c[1] -= a.r.c[1];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] -= a.c.c[2];
+			i.c[2] -= a.i.c[2];
 			r.c[2] -= a.r.c[2];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] -= a.c.c[3];
+			i.c[3] -= a.i.c[3];
 			r.c[3] -= a.r.c[3];
 		}
 		if (mask.v.c[4]) {
-			c.c[4] -= a.c.c[4];
+			i.c[4] -= a.i.c[4];
 			r.c[4] -= a.r.c[4];
 		}
 		if (mask.v.c[5]) {
-			c.c[5] -= a.c.c[5];
+			i.c[5] -= a.i.c[5];
 			r.c[5] -= a.r.c[5];
 		}
 		if (mask.v.c[6]) {
-			c.c[6] -= a.c.c[6];
+			i.c[6] -= a.i.c[6];
 			r.c[6] -= a.r.c[6];
 		}
 		if (mask.v.c[7]) {
-			c.c[7] -= a.c.c[7];
+			i.c[7] -= a.i.c[7];
 			r.c[7] -= a.r.c[7];
 		}
 		return this;
@@ -11575,35 +11802,35 @@ public:
 
 	inline Array8Complex32 *subtract(Complex32 a, VectorU8_8D mask) {
 		if (mask.v.c[0]) {
-			c.c[0] -= a.c.c[1];
+			i.c[0] -= a.c.c[1];
 			r.c[0] -= a.c.c[0];
 		}
 		if (mask.v.c[1]) {
-			c.c[1] -= a.c.c[1];
+			i.c[1] -= a.c.c[1];
 			r.c[1] -= a.c.c[0];
 		}
 		if (mask.v.c[2]) {
-			c.c[2] -= a.c.c[1];
+			i.c[2] -= a.c.c[1];
 			r.c[2] -= a.c.c[0];
 		}
 		if (mask.v.c[3]) {
-			c.c[3] -= a.c.c[1];
+			i.c[3] -= a.c.c[1];
 			r.c[3] -= a.c.c[0];
 		}
 		if (mask.v.c[4]) {
-			c.c[4] -= a.c.c[1];
+			i.c[4] -= a.c.c[1];
 			r.c[4] -= a.c.c[0];
 		}
 		if (mask.v.c[5]) {
-			c.c[5] -= a.c.c[1];
+			i.c[5] -= a.c.c[1];
 			r.c[5] -= a.c.c[0];
 		}
 		if (mask.v.c[6]) {
-			c.c[6] -= a.c.c[1];
+			i.c[6] -= a.c.c[1];
 			r.c[6] -= a.c.c[0];
 		}
 		if (mask.v.c[7]) {
-			c.c[7] -= a.c.c[1];
+			i.c[7] -= a.c.c[1];
 			r.c[7] -= a.c.c[0];
 		}
 		return this;
@@ -11612,22 +11839,22 @@ public:
 
 	inline Array8Complex32 operator*(const Array8Complex32 &a) const {
 		Array8Complex32 ret;
-		ret.r.c[0] = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		ret.c.c[0] = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
-		ret.r.c[1] = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
-		ret.r.c[2] = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		ret.c.c[2] = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
-		ret.r.c[3] = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		ret.c.c[3] = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
-		ret.r.c[4] = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
-		ret.c.c[4] = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
-		ret.r.c[5] = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
-		ret.c.c[5] = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
-		ret.r.c[6] = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
-		ret.c.c[6] = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
-		ret.r.c[7] = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
-		ret.c.c[7] = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		ret.r.c[0] = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		ret.i.c[0] = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
+		ret.r.c[1] = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		ret.i.c[1] = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
+		ret.r.c[2] = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		ret.i.c[2] = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
+		ret.r.c[3] = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		ret.i.c[3] = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
+		ret.r.c[4] = r.c[4] * a.r.c[4] - i.c[4] * a.i.c[4];
+		ret.i.c[4] = r.c[4] * a.i.c[4] + i.c[4] * a.r.c[4];
+		ret.r.c[5] = r.c[5] * a.r.c[5] - i.c[5] * a.i.c[5];
+		ret.i.c[5] = r.c[5] * a.i.c[5] + i.c[5] * a.r.c[5];
+		ret.r.c[6] = r.c[6] * a.r.c[6] - i.c[6] * a.i.c[6];
+		ret.i.c[6] = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
+		ret.r.c[7] = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
+		ret.i.c[7] = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
 
 
 		return ret;
@@ -11636,135 +11863,135 @@ public:
 	inline Array8Complex32 *multiply(const Array8Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
-		d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+		i.c[3] = d2;
+		d1 = r.c[4] * a.r.c[4] - i.c[4] * a.i.c[4];
+		d2 = r.c[4] * a.i.c[4] + i.c[4] * a.r.c[4];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
-		d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+		i.c[4] = d2;
+		d1 = r.c[5] * a.r.c[5] - i.c[5] * a.i.c[5];
+		d2 = r.c[5] * a.i.c[5] + i.c[5] * a.r.c[5];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
-		d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+		i.c[5] = d2;
+		d1 = r.c[6] * a.r.c[6] - i.c[6] * a.i.c[6];
+		d2 = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
-		d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		i.c[6] = d2;
+		d1 = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
+		d2 = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline void operator*=(const Array8Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-		d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+		d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+		d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
+		i.c[0] = d2;
 
-		d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+		d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+		d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-		d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+		d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-		d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+		d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
-		d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+		i.c[3] = d2;
+		d1 = r.c[4] * a.r.c[4] - i.c[4] * a.i.c[4];
+		d2 = r.c[4] * a.i.c[4] + i.c[4] * a.r.c[4];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
-		d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+		i.c[4] = d2;
+		d1 = r.c[5] * a.r.c[5] - i.c[5] * a.i.c[5];
+		d2 = r.c[5] * a.i.c[5] + i.c[5] * a.r.c[5];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
-		d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+		i.c[5] = d2;
+		d1 = r.c[6] * a.r.c[6] - i.c[6] * a.i.c[6];
+		d2 = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
-		d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+		i.c[6] = d2;
+		d1 = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
+		d2 = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 	}
 
 	inline void operator*=(const Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
-		d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+		i.c[3] = d2;
+		d1 = r.c[4] * a.c.c[0] - i.c[4] * a.c.c[1];
+		d2 = r.c[4] * a.c.c[1] + i.c[4] * a.c.c[0];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
-		d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+		i.c[4] = d2;
+		d1 = r.c[5] * a.c.c[0] - i.c[5] * a.c.c[1];
+		d2 = r.c[5] * a.c.c[1] + i.c[5] * a.c.c[0];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
-		d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+		i.c[5] = d2;
+		d1 = r.c[6] * a.c.c[0] - i.c[6] * a.c.c[1];
+		d2 = r.c[6] * a.c.c[1] + i.c[6] * a.c.c[0];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
-		d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		i.c[6] = d2;
+		d1 = r.c[7] * a.c.c[0] - i.c[7] * a.c.c[1];
+		d2 = r.c[7] * a.c.c[1] + i.c[7] * a.c.c[0];
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 	}
 
 	inline Array8Complex32 operator*(const Complex32 &a) const {
 		Array8Complex32 ret;
-		ret.r.c[0] = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		ret.c.c[0] = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
-		ret.r.c[1] = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		ret.c.c[1] = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
-		ret.r.c[2] = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		ret.c.c[2] = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
-		ret.r.c[3] = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		ret.c.c[3] = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
-		ret.r.c[4] = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
-		ret.c.c[4] = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
-		ret.r.c[5] = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
-		ret.c.c[5] = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
-		ret.r.c[6] = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
-		ret.c.c[6] = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
-		ret.r.c[7] = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
-		ret.c.c[7] = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		ret.r.c[0] = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		ret.i.c[0] = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
+		ret.r.c[1] = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		ret.i.c[1] = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
+		ret.r.c[2] = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		ret.i.c[2] = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
+		ret.r.c[3] = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		ret.i.c[3] = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
+		ret.r.c[4] = r.c[4] * a.c.c[0] - i.c[4] * a.c.c[1];
+		ret.i.c[4] = r.c[4] * a.c.c[1] + i.c[4] * a.c.c[0];
+		ret.r.c[5] = r.c[5] * a.c.c[0] - i.c[5] * a.c.c[1];
+		ret.i.c[5] = r.c[5] * a.c.c[1] + i.c[5] * a.c.c[0];
+		ret.r.c[6] = r.c[6] * a.c.c[0] - i.c[6] * a.c.c[1];
+		ret.i.c[6] = r.c[6] * a.c.c[1] + i.c[6] * a.c.c[0];
+		ret.r.c[7] = r.c[7] * a.c.c[0] - i.c[7] * a.c.c[1];
+		ret.i.c[7] = r.c[7] * a.c.c[1] + i.c[7] * a.c.c[0];
 
 
 		return ret;
@@ -11773,38 +12000,38 @@ public:
 	inline Array8Complex32 *multiply(const Complex32 &a) {
 		float d1;
 		float d2;
-		d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-		d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+		d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-		d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+		i.c[0] = d2;
+		d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+		d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-		d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+		i.c[1] = d2;
+		d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+		d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-		d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+		i.c[2] = d2;
+		d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+		d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
-		d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+		i.c[3] = d2;
+		d1 = r.c[4] * a.c.c[0] - i.c[4] * a.c.c[1];
+		d2 = r.c[4] * a.c.c[1] + i.c[4] * a.c.c[0];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
-		d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+		i.c[4] = d2;
+		d1 = r.c[5] * a.c.c[0] - i.c[5] * a.c.c[1];
+		d2 = r.c[5] * a.c.c[1] + i.c[5] * a.c.c[0];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
-		d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+		i.c[5] = d2;
+		d1 = r.c[6] * a.c.c[0] - i.c[6] * a.c.c[1];
+		d2 = r.c[6] * a.c.c[1] + i.c[6] * a.c.c[0];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
-		d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+		i.c[6] = d2;
+		d1 = r.c[7] * a.c.c[0] - i.c[7] * a.c.c[1];
+		d2 = r.c[7] * a.c.c[1] + i.c[7] * a.c.c[0];
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -11812,52 +12039,52 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.c.c[0] - c.c[0] * a.c.c[1];
-			d2 = r.c[0] * a.c.c[1] + c.c[0] * a.c.c[0];
+			d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
+			d2 = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.c.c[0] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.c.c[0];
+			d1 = r.c[1] * a.c.c[0] - i.c[1] * a.c.c[1];
+			d2 = r.c[1] * a.c.c[1] + i.c[1] * a.c.c[0];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * a.c.c[0] - c.c[2] * a.c.c[1];
-			d2 = r.c[2] * a.c.c[1] + c.c[2] * a.c.c[0];
+			d1 = r.c[2] * a.c.c[0] - i.c[2] * a.c.c[1];
+			d2 = r.c[2] * a.c.c[1] + i.c[2] * a.c.c[0];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * a.c.c[0] - c.c[3] * a.c.c[1];
-			d2 = r.c[3] * a.c.c[1] + c.c[3] * a.c.c[0];
+			d1 = r.c[3] * a.c.c[0] - i.c[3] * a.c.c[1];
+			d2 = r.c[3] * a.c.c[1] + i.c[3] * a.c.c[0];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = r.c[4] * a.c.c[0] - c.c[4] * a.c.c[1];
-			d2 = r.c[4] * a.c.c[1] + c.c[4] * a.c.c[0];
+			d1 = r.c[4] * a.c.c[0] - i.c[4] * a.c.c[1];
+			d2 = r.c[4] * a.c.c[1] + i.c[4] * a.c.c[0];
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = r.c[5] * a.c.c[0] - c.c[5] * a.c.c[1];
-			d2 = r.c[5] * a.c.c[1] + c.c[5] * a.c.c[0];
+			d1 = r.c[5] * a.c.c[0] - i.c[5] * a.c.c[1];
+			d2 = r.c[5] * a.c.c[1] + i.c[5] * a.c.c[0];
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = r.c[6] * a.c.c[0] - c.c[6] * a.c.c[1];
-			d2 = r.c[6] * a.c.c[1] + c.c[6] * a.c.c[0];
+			d1 = r.c[6] * a.c.c[0] - i.c[6] * a.c.c[1];
+			d2 = r.c[6] * a.c.c[1] + i.c[6] * a.c.c[0];
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = r.c[7] * a.c.c[0] - c.c[7] * a.c.c[1];
-			d2 = r.c[7] * a.c.c[1] + c.c[7] * a.c.c[0];
+			d1 = r.c[7] * a.c.c[0] - i.c[7] * a.c.c[1];
+			d2 = r.c[7] * a.c.c[1] + i.c[7] * a.c.c[0];
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 
@@ -11868,52 +12095,52 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * a.r.c[0] - c.c[0] * a.c.c[0];
-			d2 = r.c[0] * a.c.c[0] + c.c[0] * a.r.c[0];
+			d1 = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
+			d2 = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * a.r.c[1] - c.c[1] * a.c.c[1];
-			d2 = r.c[1] * a.c.c[1] + c.c[1] * a.r.c[1];
+			d1 = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
+			d2 = r.c[1] * a.i.c[1] + i.c[1] * a.r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * a.r.c[2] - c.c[2] * a.c.c[2];
-			d2 = r.c[2] * a.c.c[2] + c.c[2] * a.r.c[2];
+			d1 = r.c[2] * a.r.c[2] - i.c[2] * a.i.c[2];
+			d2 = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * a.r.c[3] - c.c[3] * a.c.c[3];
-			d2 = r.c[3] * a.c.c[3] + c.c[3] * a.r.c[3];
+			d1 = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
+			d2 = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = r.c[4] * a.r.c[4] - c.c[4] * a.c.c[4];
-			d2 = r.c[4] * a.c.c[4] + c.c[4] * a.r.c[4];
+			d1 = r.c[4] * a.r.c[4] - i.c[4] * a.i.c[4];
+			d2 = r.c[4] * a.i.c[4] + i.c[4] * a.r.c[4];
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = r.c[5] * a.r.c[5] - c.c[5] * a.c.c[5];
-			d2 = r.c[5] * a.c.c[5] + c.c[5] * a.r.c[5];
+			d1 = r.c[5] * a.r.c[5] - i.c[5] * a.i.c[5];
+			d2 = r.c[5] * a.i.c[5] + i.c[5] * a.r.c[5];
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = r.c[6] * a.r.c[6] - c.c[6] * a.c.c[6];
-			d2 = r.c[6] * a.c.c[6] + c.c[6] * a.r.c[6];
+			d1 = r.c[6] * a.r.c[6] - i.c[6] * a.i.c[6];
+			d2 = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = r.c[7] * a.r.c[7] - c.c[7] * a.c.c[7];
-			d2 = r.c[7] * a.c.c[7] + c.c[7] * a.r.c[7];
+			d1 = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
+			d2 = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -11921,38 +12148,38 @@ public:
 	inline Array8Complex32 *square() {
 		float d1;
 		float d2;
-		d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-		d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+		d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+		d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-		d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+		i.c[0] = d2;
+		d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+		d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
-		d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+		i.c[1] = d2;
+		d1 = r.c[2] * r.c[2] - i.c[2] * i.c[2];
+		d2 = r.c[2] * i.c[2] + i.c[2] * r.c[2];
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
-		d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+		i.c[2] = d2;
+		d1 = r.c[3] * r.c[3] - i.c[3] * i.c[3];
+		d2 = r.c[3] * i.c[3] + i.c[3] * r.c[3];
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = r.c[4] * r.c[4] - c.c[4] * c.c[4];
-		d2 = r.c[4] * c.c[4] + c.c[4] * r.c[4];
+		i.c[3] = d2;
+		d1 = r.c[4] * r.c[4] - i.c[4] * i.c[4];
+		d2 = r.c[4] * i.c[4] + i.c[4] * r.c[4];
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = r.c[5] * r.c[5] - c.c[5] * c.c[5];
-		d2 = r.c[5] * c.c[5] + c.c[5] * r.c[5];
+		i.c[4] = d2;
+		d1 = r.c[5] * r.c[5] - i.c[5] * i.c[5];
+		d2 = r.c[5] * i.c[5] + i.c[5] * r.c[5];
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = r.c[6] * r.c[6] - c.c[6] * c.c[6];
-		d2 = r.c[6] * c.c[6] + c.c[6] * r.c[6];
+		i.c[5] = d2;
+		d1 = r.c[6] * r.c[6] - i.c[6] * i.c[6];
+		d2 = r.c[6] * i.c[6] + i.c[6] * r.c[6];
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
-		d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
+		i.c[6] = d2;
+		d1 = r.c[7] * r.c[7] - i.c[7] * i.c[7];
+		d2 = r.c[7] * i.c[7] + i.c[7] * r.c[7];
 		r.c[7] = d1;
-		c.c[7] =
+		i.c[7] =
 				d2;
 		return this;
 	}
@@ -11961,89 +12188,89 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = r.c[0] * r.c[0] - c.c[0] * c.c[0];
-			d2 = r.c[0] * c.c[0] + c.c[0] * r.c[0];
+			d1 = r.c[0] * r.c[0] - i.c[0] * i.c[0];
+			d2 = r.c[0] * i.c[0] + i.c[0] * r.c[0];
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = r.c[1] * r.c[1] - c.c[1] * c.c[1];
-			d2 = r.c[1] * c.c[1] + c.c[1] * r.c[1];
+			d1 = r.c[1] * r.c[1] - i.c[1] * i.c[1];
+			d2 = r.c[1] * i.c[1] + i.c[1] * r.c[1];
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = r.c[2] * r.c[2] - c.c[2] * c.c[2];
-			d2 = r.c[2] * c.c[2] + c.c[2] * r.c[2];
+			d1 = r.c[2] * r.c[2] - i.c[2] * i.c[2];
+			d2 = r.c[2] * i.c[2] + i.c[2] * r.c[2];
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = r.c[3] * r.c[3] - c.c[3] * c.c[3];
-			d2 = r.c[3] * c.c[3] + c.c[3] * r.c[3];
+			d1 = r.c[3] * r.c[3] - i.c[3] * i.c[3];
+			d2 = r.c[3] * i.c[3] + i.c[3] * r.c[3];
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = r.c[4] * r.c[4] - c.c[4] * c.c[4];
-			d2 = r.c[4] * c.c[4] + c.c[4] * r.c[4];
+			d1 = r.c[4] * r.c[4] - i.c[4] * i.c[4];
+			d2 = r.c[4] * i.c[4] + i.c[4] * r.c[4];
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = r.c[5] * r.c[5] - c.c[5] * c.c[5];
-			d2 = r.c[5] * c.c[5] + c.c[5] * r.c[5];
+			d1 = r.c[5] * r.c[5] - i.c[5] * i.c[5];
+			d2 = r.c[5] * i.c[5] + i.c[5] * r.c[5];
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = r.c[6] * r.c[6] - c.c[6] * c.c[6];
-			d2 = r.c[6] * c.c[6] + c.c[6] * r.c[6];
+			d1 = r.c[6] * r.c[6] - i.c[6] * i.c[6];
+			d2 = r.c[6] * i.c[6] + i.c[6] * r.c[6];
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = r.c[7] * r.c[7] - c.c[7] * c.c[7];
-			d2 = r.c[7] * c.c[7] + c.c[7] * r.c[7];
+			d1 = r.c[7] * r.c[7] - i.c[7] * i.c[7];
+			d2 = r.c[7] * i.c[7] + i.c[7] * r.c[7];
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 	inline Array8Complex32 *divide(const Complex32 a) {
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + i.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + i.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + i.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + i.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -12051,89 +12278,89 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[4] * a.c.c[0] + i.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[5] * a.c.c[0] + i.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[6] * a.c.c[0] + i.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[7] * a.c.c[0] + i.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d2 = (i.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 	inline Array8Complex32 *divide(const Array8Complex32 &a) {
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
-		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		i.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + i.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
+		d2 = (i.c[4] * a.r.c[4] - r.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
-		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		i.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + i.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
+		d2 = (i.c[5] * a.r.c[5] - r.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
-		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		i.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + i.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
+		d2 = (i.c[6] * a.r.c[6] - r.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
-		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		i.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + i.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
+		d2 = (i.c[7] * a.r.c[7] - r.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -12141,267 +12368,267 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[0] * a.i.c[0] + i.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[0] * a.i.c[0] - r.c[0] * a.i.c[1]) / (a.i.c[0] * a.i.c[0] + a.i.c[1] * a.i.c[1]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-			d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+			d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+			d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-			d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+			d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+			d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-			d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+			d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+			d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
-			d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+			d1 = (r.c[4] * a.r.c[4] + i.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
+			d2 = (i.c[4] * a.r.c[4] - r.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
-			d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+			d1 = (r.c[5] * a.r.c[5] + i.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
+			d2 = (i.c[5] * a.r.c[5] - r.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
-			d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+			d1 = (r.c[6] * a.r.c[6] + i.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
+			d2 = (i.c[6] * a.r.c[6] - r.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
-			d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+			d1 = (r.c[7] * a.r.c[7] + i.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
+			d2 = (i.c[7] * a.r.c[7] - r.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 	inline Array8Complex32 operator/(const Complex32 &a) const {
 		Array8Complex32 ret;
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[2] = d1;
-		ret.c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[3] = d1;
-		ret.c.c[3] = d2;
-		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + i.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[4] = d1;
-		ret.c.c[4] = d2;
-		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + i.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[5] = d1;
-		ret.c.c[5] = d2;
-		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + i.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[6] = d1;
-		ret.c.c[6] = d2;
-		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + i.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		ret.r.c[7] = d1;
-		ret.c.c[7] = d2;
+		ret.i.c[7] = d2;
 		return ret;
 	}
 
 	inline Array8Complex32 operator/(const Array8Complex32 &a) const {
 		Array8Complex32 ret;
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		ret.r.c[0] = d1;
-		ret.c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		ret.i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		ret.r.c[1] = d1;
-		ret.c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		ret.i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		ret.r.c[2] = d1;
-		ret.c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		ret.i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		ret.r.c[3] = d1;
-		ret.c.c[3] = d2;
-		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
-		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		ret.i.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + i.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
+		d2 = (i.c[4] * a.r.c[4] - r.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
 		ret.r.c[4] = d1;
-		ret.c.c[4] = d2;
-		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
-		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		ret.i.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + i.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
+		d2 = (i.c[5] * a.r.c[5] - r.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
 		ret.r.c[5] = d1;
-		ret.c.c[5] = d2;
-		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
-		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		ret.i.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + i.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
+		d2 = (i.c[6] * a.r.c[6] - r.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
 		ret.r.c[6] = d1;
-		ret.c.c[6] = d2;
-		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
-		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		ret.i.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + i.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
+		d2 = (i.c[7] * a.r.c[7] - r.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
 		ret.r.c[7] = d1;
-		ret.c.c[7] = d2;
+		ret.i.c[7] = d2;
 		return ret;
 	}
 
 	inline void operator/=(const Complex32 &a) {
-		float d1 = (r.c[0] * a.c.c[0] + c.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		float d2 = (c.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		float d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.c.c[0] + c.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.c.c[0] + i.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[1] * a.c.c[0] - r.c[1] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.c.c[0] + c.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.c.c[0] + i.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[2] * a.c.c[0] - r.c[2] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.c.c[0] + c.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.c.c[0] + i.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[3] * a.c.c[0] - r.c[3] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = (r.c[4] * a.c.c[0] + c.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[3] = d2;
+		d1 = (r.c[4] * a.c.c[0] + i.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[4] * a.c.c[0] - r.c[4] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = (r.c[5] * a.c.c[0] + c.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[4] = d2;
+		d1 = (r.c[5] * a.c.c[0] + i.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[5] * a.c.c[0] - r.c[5] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = (r.c[6] * a.c.c[0] + c.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[5] = d2;
+		d1 = (r.c[6] * a.c.c[0] + i.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[6] * a.c.c[0] - r.c[6] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = (r.c[7] * a.c.c[0] + c.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		i.c[6] = d2;
+		d1 = (r.c[7] * a.c.c[0] + i.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
+		d2 = (i.c[7] * a.c.c[0] - r.c[7] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 	}
 
 	inline void operator/=(const Array8Complex32 &a) {
-		float d1 = (r.c[0] * a.r.c[0] + c.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
-		float d2 = (c.c[0] * a.r.c[0] - r.c[0] * a.c.c[0]) / (a.r.c[0] * a.r.c[0] + a.c.c[0] * a.c.c[0]);
+		float d1 = (r.c[0] * a.r.c[0] + i.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
+		float d2 = (i.c[0] * a.r.c[0] - r.c[0] * a.i.c[0]) / (a.r.c[0] * a.r.c[0] + a.i.c[0] * a.i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = (r.c[1] * a.r.c[1] + c.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
-		d2 = (c.c[1] * a.r.c[1] - r.c[1] * a.c.c[1]) / (a.r.c[1] * a.r.c[1] + a.c.c[1] * a.c.c[1]);
+		i.c[0] = d2;
+		d1 = (r.c[1] * a.r.c[1] + i.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
+		d2 = (i.c[1] * a.r.c[1] - r.c[1] * a.i.c[1]) / (a.r.c[1] * a.r.c[1] + a.i.c[1] * a.i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = (r.c[2] * a.r.c[2] + c.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
-		d2 = (c.c[2] * a.r.c[2] - r.c[2] * a.c.c[2]) / (a.r.c[2] * a.r.c[2] + a.c.c[2] * a.c.c[2]);
+		i.c[1] = d2;
+		d1 = (r.c[2] * a.r.c[2] + i.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
+		d2 = (i.c[2] * a.r.c[2] - r.c[2] * a.i.c[2]) / (a.r.c[2] * a.r.c[2] + a.i.c[2] * a.i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = (r.c[3] * a.r.c[3] + c.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
-		d2 = (c.c[3] * a.r.c[3] - r.c[3] * a.c.c[3]) / (a.r.c[3] * a.r.c[3] + a.c.c[3] * a.c.c[3]);
+		i.c[2] = d2;
+		d1 = (r.c[3] * a.r.c[3] + i.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
+		d2 = (i.c[3] * a.r.c[3] - r.c[3] * a.i.c[3]) / (a.r.c[3] * a.r.c[3] + a.i.c[3] * a.i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = (r.c[4] * a.r.c[4] + c.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
-		d2 = (c.c[4] * a.r.c[4] - r.c[4] * a.c.c[4]) / (a.r.c[4] * a.r.c[4] + a.c.c[4] * a.c.c[4]);
+		i.c[3] = d2;
+		d1 = (r.c[4] * a.r.c[4] + i.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
+		d2 = (i.c[4] * a.r.c[4] - r.c[4] * a.i.c[4]) / (a.r.c[4] * a.r.c[4] + a.i.c[4] * a.i.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = (r.c[5] * a.r.c[5] + c.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
-		d2 = (c.c[5] * a.r.c[5] - r.c[5] * a.c.c[5]) / (a.r.c[5] * a.r.c[5] + a.c.c[5] * a.c.c[5]);
+		i.c[4] = d2;
+		d1 = (r.c[5] * a.r.c[5] + i.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
+		d2 = (i.c[5] * a.r.c[5] - r.c[5] * a.i.c[5]) / (a.r.c[5] * a.r.c[5] + a.i.c[5] * a.i.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = (r.c[6] * a.r.c[6] + c.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
-		d2 = (c.c[6] * a.r.c[6] - r.c[6] * a.c.c[6]) / (a.r.c[6] * a.r.c[6] + a.c.c[6] * a.c.c[6]);
+		i.c[5] = d2;
+		d1 = (r.c[6] * a.r.c[6] + i.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
+		d2 = (i.c[6] * a.r.c[6] - r.c[6] * a.i.c[6]) / (a.r.c[6] * a.r.c[6] + a.i.c[6] * a.i.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = (r.c[7] * a.r.c[7] + c.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
-		d2 = (c.c[7] * a.r.c[7] - r.c[7] * a.c.c[7]) / (a.r.c[7] * a.r.c[7] + a.c.c[7] * a.c.c[7]);
+		i.c[6] = d2;
+		d1 = (r.c[7] * a.r.c[7] + i.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
+		d2 = (i.c[7] * a.r.c[7] - r.c[7] * a.i.c[7]) / (a.r.c[7] * a.r.c[7] + a.i.c[7] * a.i.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 	}
 
 	inline Array8Complex32 *sqrt() {
 		float d1;
 		float d2;
-		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+		d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[0]);
 		} else LIKELY {
-			d1 = c.c[0] / (2 * d2);
+			d1 = i.c[0] / (2 * d2);
 		}
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+		i.c[0] = d2;
+		d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[1]);
 		} else LIKELY {
-			d1 = c.c[1] / (2 * d2);
+			d1 = i.c[1] / (2 * d2);
 		}
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+		i.c[1] = d2;
+		d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[2]);
 		} else LIKELY {
-			d1 = c.c[2] / (2 * d2);
+			d1 = i.c[2] / (2 * d2);
 		}
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+		i.c[2] = d2;
+		d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[3]);
 		} else LIKELY {
-			d1 = c.c[3] / (2 * d2);
+			d1 = i.c[3] / (2 * d2);
 		}
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4])) / (2));
+		i.c[3] = d2;
+		d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + i.c[4] * i.c[4])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[4]);
 		} else LIKELY {
-			d1 = c.c[4] / (2 * d2);
+			d1 = i.c[4] / (2 * d2);
 		}
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5])) / (2));
+		i.c[4] = d2;
+		d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + i.c[5] * i.c[5])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[5]);
 		} else LIKELY {
-			d1 = c.c[5] / (2 * d2);
+			d1 = i.c[5] / (2 * d2);
 		}
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6])) / (2));
+		i.c[5] = d2;
+		d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + i.c[6] * i.c[6])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[6]);
 		} else LIKELY {
-			d1 = c.c[6] / (2 * d2);
+			d1 = i.c[6] / (2 * d2);
 		}
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7])) / (2));
+		i.c[6] = d2;
+		d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + i.c[7] * i.c[7])) / (2));
 		if (d2 == 0) UNLIKELY {
 			d1 = ::sqrt(r.c[7]);
 		} else LIKELY {
-			d1 = c.c[7] / (2 * d2);
+			d1 = i.c[7] / (2 * d2);
 		}
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -12409,84 +12636,84 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0])) / (2));
+			d2 = ::sqrt((-r.c[0] + ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[0]);
 			} else LIKELY {
-				d1 = c.c[0] / (2 * d2);
+				d1 = i.c[0] / (2 * d2);
 			}
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1])) / (2));
+			d2 = ::sqrt((-r.c[1] + ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[1]);
 			} else LIKELY {
-				d1 = c.c[1] / (2 * d2);
+				d1 = i.c[1] / (2 * d2);
 			}
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2])) / (2));
+			d2 = ::sqrt((-r.c[2] + ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[2]);
 			} else LIKELY {
-				d1 = c.c[2] / (2 * d2);
+				d1 = i.c[2] / (2 * d2);
 			}
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3])) / (2));
+			d2 = ::sqrt((-r.c[3] + ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[3]);
 			} else LIKELY {
-				d1 = c.c[3] / (2 * d2);
+				d1 = i.c[3] / (2 * d2);
 			}
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4])) / (2));
+			d2 = ::sqrt((-r.c[4] + ::sqrt(r.c[4] * r.c[4] + i.c[4] * i.c[4])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[4]);
 			} else LIKELY {
-				d1 = c.c[4] / (2 * d2);
+				d1 = i.c[4] / (2 * d2);
 			}
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5])) / (2));
+			d2 = ::sqrt((-r.c[5] + ::sqrt(r.c[5] * r.c[5] + i.c[5] * i.c[5])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[5]);
 			} else LIKELY {
-				d1 = c.c[5] / (2 * d2);
+				d1 = i.c[5] / (2 * d2);
 			}
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6])) / (2));
+			d2 = ::sqrt((-r.c[6] + ::sqrt(r.c[6] * r.c[6] + i.c[6] * i.c[6])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[6]);
 			} else LIKELY {
-				d1 = c.c[6] / (2 * d2);
+				d1 = i.c[6] / (2 * d2);
 			}
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7])) / (2));
+			d2 = ::sqrt((-r.c[7] + ::sqrt(r.c[7] * r.c[7] + i.c[7] * i.c[7])) / (2));
 			if (d2 == 0) UNLIKELY {
 				d1 = ::sqrt(r.c[7]);
 			} else LIKELY {
-				d1 = c.c[7] / (2 * d2);
+				d1 = i.c[7] / (2 * d2);
 			}
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -12494,114 +12721,114 @@ public:
 	inline Array8Complex32 *sin() {
 		float d1;
 		float d2;
-		d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-		d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+		d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-		d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+		d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
-		d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+		i.c[1] = d2;
+		d1 = ::sin(r.c[2]) * ::cosh(i.c[2]);
+		d2 = ::cos(i.c[2]) * ::sinh(r.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
-		d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+		i.c[2] = d2;
+		d1 = ::sin(r.c[3]) * ::cosh(i.c[3]);
+		d2 = ::cos(i.c[3]) * ::sinh(r.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::sin(r.c[4]) * ::cosh(c.c[4]);
-		d2 = ::cos(c.c[4]) * ::sinh(r.c[4]);
+		i.c[3] = d2;
+		d1 = ::sin(r.c[4]) * ::cosh(i.c[4]);
+		d2 = ::cos(i.c[4]) * ::sinh(r.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::sin(r.c[5]) * ::cosh(c.c[5]);
-		d2 = ::cos(c.c[5]) * ::sinh(r.c[5]);
+		i.c[4] = d2;
+		d1 = ::sin(r.c[5]) * ::cosh(i.c[5]);
+		d2 = ::cos(i.c[5]) * ::sinh(r.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::sin(r.c[6]) * ::cosh(c.c[6]);
-		d2 = ::cos(c.c[6]) * ::sinh(r.c[6]);
+		i.c[5] = d2;
+		d1 = ::sin(r.c[6]) * ::cosh(i.c[6]);
+		d2 = ::cos(i.c[6]) * ::sinh(r.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::sin(r.c[7]) * ::cosh(c.c[7]);
-		d2 = ::cos(c.c[7]) * ::sinh(r.c[7]);
+		i.c[6] = d2;
+		d1 = ::sin(r.c[7]) * ::cosh(i.c[7]);
+		d2 = ::cos(i.c[7]) * ::sinh(r.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline Array8Complex32 *cos() {
 		float d1;
 		float d2;
-		d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-		d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+		d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+		d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-		d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+		i.c[0] = d2;
+		d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+		d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
-		d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+		i.c[1] = d2;
+		d1 = ::cos(r.c[2]) * ::cosh(i.c[2]);
+		d2 = -::sin(i.c[2]) * ::sinh(r.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
-		d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+		i.c[2] = d2;
+		d1 = ::cos(r.c[3]) * ::cosh(i.c[3]);
+		d2 = -::sin(i.c[3]) * ::sinh(r.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::cos(r.c[4]) * ::cosh(c.c[4]);
-		d2 = -::sin(c.c[4]) * ::sinh(r.c[4]);
+		i.c[3] = d2;
+		d1 = ::cos(r.c[4]) * ::cosh(i.c[4]);
+		d2 = -::sin(i.c[4]) * ::sinh(r.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::cos(r.c[5]) * ::cosh(c.c[5]);
-		d2 = -::sin(c.c[5]) * ::sinh(r.c[5]);
+		i.c[4] = d2;
+		d1 = ::cos(r.c[5]) * ::cosh(i.c[5]);
+		d2 = -::sin(i.c[5]) * ::sinh(r.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::cos(r.c[6]) * ::cosh(c.c[6]);
-		d2 = -::sin(c.c[6]) * ::sinh(r.c[6]);
+		i.c[5] = d2;
+		d1 = ::cos(r.c[6]) * ::cosh(i.c[6]);
+		d2 = -::sin(i.c[6]) * ::sinh(r.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::cos(r.c[7]) * ::cosh(c.c[7]);
-		d2 = -::sin(c.c[7]) * ::sinh(r.c[7]);
+		i.c[6] = d2;
+		d1 = ::cos(r.c[7]) * ::cosh(i.c[7]);
+		d2 = -::sin(i.c[7]) * ::sinh(r.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline Array8Complex32 *tan() {
 		float d1;
 		float d2;
-		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-		d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+		d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+		d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-		d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+		i.c[0] = d2;
+		d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+		d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
-		d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+		i.c[1] = d2;
+		d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
+		d2 = ::sinh(i.c[2] + i.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
-		d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+		i.c[2] = d2;
+		d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
+		d2 = ::sinh(i.c[3] + i.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
-		d2 = ::sinh(c.c[4] + c.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+		i.c[3] = d2;
+		d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(i.c[4] + i.c[4]));
+		d2 = ::sinh(i.c[4] + i.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(i.c[4] + i.c[4]));
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
-		d2 = ::sinh(c.c[5] + c.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+		i.c[4] = d2;
+		d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(i.c[5] + i.c[5]));
+		d2 = ::sinh(i.c[5] + i.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(i.c[5] + i.c[5]));
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
-		d2 = ::sinh(c.c[6] + c.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+		i.c[5] = d2;
+		d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(i.c[6] + i.c[6]));
+		d2 = ::sinh(i.c[6] + i.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(i.c[6] + i.c[6]));
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
-		d2 = ::sinh(c.c[7] + c.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+		i.c[6] = d2;
+		d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(i.c[7] + i.c[7]));
+		d2 = ::sinh(i.c[7] + i.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(i.c[7] + i.c[7]));
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
@@ -12609,52 +12836,52 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0]) * ::cosh(c.c[0]);
-			d2 = ::cos(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::sin(r.c[0]) * ::cosh(i.c[0]);
+			d2 = ::cos(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1]) * ::cosh(c.c[1]);
-			d2 = ::cos(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::sin(r.c[1]) * ::cosh(i.c[1]);
+			d2 = ::cos(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::sin(r.c[2]) * ::cosh(c.c[2]);
-			d2 = ::cos(c.c[2]) * ::sinh(r.c[2]);
+			d1 = ::sin(r.c[2]) * ::cosh(i.c[2]);
+			d2 = ::cos(i.c[2]) * ::sinh(r.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::sin(r.c[3]) * ::cosh(c.c[3]);
-			d2 = ::cos(c.c[3]) * ::sinh(r.c[3]);
+			d1 = ::sin(r.c[3]) * ::cosh(i.c[3]);
+			d2 = ::cos(i.c[3]) * ::sinh(r.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::sin(r.c[4]) * ::cosh(c.c[4]);
-			d2 = ::cos(c.c[4]) * ::sinh(r.c[4]);
+			d1 = ::sin(r.c[4]) * ::cosh(i.c[4]);
+			d2 = ::cos(i.c[4]) * ::sinh(r.c[4]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::sin(r.c[5]) * ::cosh(c.c[5]);
-			d2 = ::cos(c.c[5]) * ::sinh(r.c[5]);
+			d1 = ::sin(r.c[5]) * ::cosh(i.c[5]);
+			d2 = ::cos(i.c[5]) * ::sinh(r.c[5]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::sin(r.c[6]) * ::cosh(c.c[6]);
-			d2 = ::cos(c.c[6]) * ::sinh(r.c[6]);
+			d1 = ::sin(r.c[6]) * ::cosh(i.c[6]);
+			d2 = ::cos(i.c[6]) * ::sinh(r.c[6]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::sin(r.c[7]) * ::cosh(c.c[7]);
-			d2 = ::cos(c.c[7]) * ::sinh(r.c[7]);
+			d1 = ::sin(r.c[7]) * ::cosh(i.c[7]);
+			d2 = ::cos(i.c[7]) * ::sinh(r.c[7]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -12663,52 +12890,52 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::cos(r.c[0]) * ::cosh(c.c[0]);
-			d2 = -::sin(c.c[0]) * ::sinh(r.c[0]);
+			d1 = ::cos(r.c[0]) * ::cosh(i.c[0]);
+			d2 = -::sin(i.c[0]) * ::sinh(r.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::cos(r.c[1]) * ::cosh(c.c[1]);
-			d2 = -::sin(c.c[1]) * ::sinh(r.c[1]);
+			d1 = ::cos(r.c[1]) * ::cosh(i.c[1]);
+			d2 = -::sin(i.c[1]) * ::sinh(r.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::cos(r.c[2]) * ::cosh(c.c[2]);
-			d2 = -::sin(c.c[2]) * ::sinh(r.c[2]);
+			d1 = ::cos(r.c[2]) * ::cosh(i.c[2]);
+			d2 = -::sin(i.c[2]) * ::sinh(r.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::cos(r.c[3]) * ::cosh(c.c[3]);
-			d2 = -::sin(c.c[3]) * ::sinh(r.c[3]);
+			d1 = ::cos(r.c[3]) * ::cosh(i.c[3]);
+			d2 = -::sin(i.c[3]) * ::sinh(r.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::cos(r.c[4]) * ::cosh(c.c[4]);
-			d2 = -::sin(c.c[4]) * ::sinh(r.c[4]);
+			d1 = ::cos(r.c[4]) * ::cosh(i.c[4]);
+			d2 = -::sin(i.c[4]) * ::sinh(r.c[4]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::cos(r.c[5]) * ::cosh(c.c[5]);
-			d2 = -::sin(c.c[5]) * ::sinh(r.c[5]);
+			d1 = ::cos(r.c[5]) * ::cosh(i.c[5]);
+			d2 = -::sin(i.c[5]) * ::sinh(r.c[5]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::cos(r.c[6]) * ::cosh(c.c[6]);
-			d2 = -::sin(c.c[6]) * ::sinh(r.c[6]);
+			d1 = ::cos(r.c[6]) * ::cosh(i.c[6]);
+			d2 = -::sin(i.c[6]) * ::sinh(r.c[6]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::cos(r.c[7]) * ::cosh(c.c[7]);
-			d2 = -::sin(c.c[7]) * ::sinh(r.c[7]);
+			d1 = ::cos(r.c[7]) * ::cosh(i.c[7]);
+			d2 = -::sin(i.c[7]) * ::sinh(r.c[7]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -12717,262 +12944,262 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
-			d2 = ::sinh(c.c[0] + c.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(c.c[0] + c.c[0]));
+			d1 = ::sin(r.c[0] + r.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
+			d2 = ::sinh(i.c[0] + i.c[0]) / (::cos(r.c[0] + r.c[0]) * ::cosh(i.c[0] + i.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
-			d2 = ::sinh(c.c[1] + c.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(c.c[1] + c.c[1]));
+			d1 = ::sin(r.c[1] + r.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
+			d2 = ::sinh(i.c[1] + i.c[1]) / (::cos(r.c[1] + r.c[1]) * ::cosh(i.c[1] + i.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
-			d2 = ::sinh(c.c[2] + c.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(c.c[2] + c.c[2]));
+			d1 = ::sin(r.c[2] + r.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
+			d2 = ::sinh(i.c[2] + i.c[2]) / (::cos(r.c[2] + r.c[2]) * ::cosh(i.c[2] + i.c[2]));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
-			d2 = ::sinh(c.c[3] + c.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(c.c[3] + c.c[3]));
+			d1 = ::sin(r.c[3] + r.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
+			d2 = ::sinh(i.c[3] + i.c[3]) / (::cos(r.c[3] + r.c[3]) * ::cosh(i.c[3] + i.c[3]));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
-			d2 = ::sinh(c.c[4] + c.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(c.c[4] + c.c[4]));
+			d1 = ::sin(r.c[4] + r.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(i.c[4] + i.c[4]));
+			d2 = ::sinh(i.c[4] + i.c[4]) / (::cos(r.c[4] + r.c[4]) * ::cosh(i.c[4] + i.c[4]));
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
-			d2 = ::sinh(c.c[5] + c.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(c.c[5] + c.c[5]));
+			d1 = ::sin(r.c[5] + r.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(i.c[5] + i.c[5]));
+			d2 = ::sinh(i.c[5] + i.c[5]) / (::cos(r.c[5] + r.c[5]) * ::cosh(i.c[5] + i.c[5]));
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
-			d2 = ::sinh(c.c[6] + c.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(c.c[6] + c.c[6]));
+			d1 = ::sin(r.c[6] + r.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(i.c[6] + i.c[6]));
+			d2 = ::sinh(i.c[6] + i.c[6]) / (::cos(r.c[6] + r.c[6]) * ::cosh(i.c[6] + i.c[6]));
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
-			d2 = ::sinh(c.c[7] + c.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(c.c[7] + c.c[7]));
+			d1 = ::sin(r.c[7] + r.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(i.c[7] + i.c[7]));
+			d2 = ::sinh(i.c[7] + i.c[7]) / (::cos(r.c[7] + r.c[7]) * ::cosh(i.c[7] + i.c[7]));
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 
 	inline Array8Complex32 *exp() {
-		float d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-		float d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+		float d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+		float d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-		d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+		i.c[0] = d2;
+		d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+		d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
-		d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+		i.c[1] = d2;
+		d1 = ::exp(r.c[2]) * ::cos(i.c[2]);
+		d2 = ::exp(r.c[2]) * ::sin(i.c[2]);
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
-		d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+		i.c[2] = d2;
+		d1 = ::exp(r.c[3]) * ::cos(i.c[3]);
+		d2 = ::exp(r.c[3]) * ::sin(i.c[3]);
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::exp(r.c[4]) * ::cos(c.c[4]);
-		d2 = ::exp(r.c[4]) * ::sin(c.c[4]);
+		i.c[3] = d2;
+		d1 = ::exp(r.c[4]) * ::cos(i.c[4]);
+		d2 = ::exp(r.c[4]) * ::sin(i.c[4]);
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::exp(r.c[5]) * ::cos(c.c[5]);
-		d2 = ::exp(r.c[5]) * ::sin(c.c[5]);
+		i.c[4] = d2;
+		d1 = ::exp(r.c[5]) * ::cos(i.c[5]);
+		d2 = ::exp(r.c[5]) * ::sin(i.c[5]);
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::exp(r.c[6]) * ::cos(c.c[6]);
-		d2 = ::exp(r.c[6]) * ::sin(c.c[6]);
+		i.c[5] = d2;
+		d1 = ::exp(r.c[6]) * ::cos(i.c[6]);
+		d2 = ::exp(r.c[6]) * ::sin(i.c[6]);
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::exp(r.c[7]) * ::cos(c.c[7]);
-		d2 = ::exp(r.c[7]) * ::sin(c.c[7]);
+		i.c[6] = d2;
+		d1 = ::exp(r.c[7]) * ::cos(i.c[7]);
+		d2 = ::exp(r.c[7]) * ::sin(i.c[7]);
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline Array8Complex32 *exp(float n) {
-		float d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-		float d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+		float d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+		float d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-		d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+		i.c[0] = d2;
+		d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+		d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
-		d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+		i.c[1] = d2;
+		d1 = ::pow(n, r.c[2]) * ::cos(i.c[2] * ::log(n));
+		d2 = ::pow(n, r.c[2]) * ::sin(i.c[2] * ::log(n));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
-		d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+		i.c[2] = d2;
+		d1 = ::pow(n, r.c[3]) * ::cos(i.c[3] * ::log(n));
+		d2 = ::pow(n, r.c[3]) * ::sin(i.c[3] * ::log(n));
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::pow(n, r.c[4]) * ::cos(c.c[4] * ::log(n));
-		d2 = ::pow(n, r.c[4]) * ::sin(c.c[4] * ::log(n));
+		i.c[3] = d2;
+		d1 = ::pow(n, r.c[4]) * ::cos(i.c[4] * ::log(n));
+		d2 = ::pow(n, r.c[4]) * ::sin(i.c[4] * ::log(n));
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::pow(n, r.c[5]) * ::cos(c.c[5] * ::log(n));
-		d2 = ::pow(n, r.c[5]) * ::sin(c.c[5] * ::log(n));
+		i.c[4] = d2;
+		d1 = ::pow(n, r.c[5]) * ::cos(i.c[5] * ::log(n));
+		d2 = ::pow(n, r.c[5]) * ::sin(i.c[5] * ::log(n));
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::pow(n, r.c[6]) * ::cos(c.c[6] * ::log(n));
-		d2 = ::pow(n, r.c[6]) * ::sin(c.c[6] * ::log(n));
+		i.c[5] = d2;
+		d1 = ::pow(n, r.c[6]) * ::cos(i.c[6] * ::log(n));
+		d2 = ::pow(n, r.c[6]) * ::sin(i.c[6] * ::log(n));
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::pow(n, r.c[7]) * ::cos(c.c[7] * ::log(n));
-		d2 = ::pow(n, r.c[7]) * ::sin(c.c[7] * ::log(n));
+		i.c[6] = d2;
+		d1 = ::pow(n, r.c[7]) * ::cos(i.c[7] * ::log(n));
+		d2 = ::pow(n, r.c[7]) * ::sin(i.c[7] * ::log(n));
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 		return this;
 	}
 
 	inline Array8Complex32 *pow(Array8Complex32 n) {
-		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		float d2 = ::atan2(r.c[0], c.c[0]);
-		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-		float d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+		float d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], i.c[0]);
+		float d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+		float d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 		float d5 = d3 * ::cos(d4);
 		float d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-		d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+		d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
-		d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		d3 = ::exp(d1 * n.i.c[2] - d2 * n.r.c[2]);
+		d4 = d1 * n.r.c[2] + d2 * n.i.c[2];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[2] = d5;
+		i.c[2] = d5;
 		r.c[2] = d6;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
-		d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		d3 = ::exp(d1 * n.i.c[3] - d2 * n.r.c[3]);
+		d4 = d1 * n.r.c[3] + d2 * n.i.c[3];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[3] = d5;
+		i.c[3] = d5;
 		r.c[3] = d6;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-		d2 = ::atan2(r.c[4], c.c[4]);
-		d3 = ::exp(d1 * n.c.c[4] - d2 * n.r.c[4]);
-		d4 = d1 * n.r.c[4] + d2 * n.c.c[4];
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], i.c[4]);
+		d3 = ::exp(d1 * n.i.c[4] - d2 * n.r.c[4]);
+		d4 = d1 * n.r.c[4] + d2 * n.i.c[4];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[4] = d5;
+		i.c[4] = d5;
 		r.c[4] = d6;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-		d2 = ::atan2(r.c[5], c.c[5]);
-		d3 = ::exp(d1 * n.c.c[5] - d2 * n.r.c[5]);
-		d4 = d1 * n.r.c[5] + d2 * n.c.c[5];
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], i.c[5]);
+		d3 = ::exp(d1 * n.i.c[5] - d2 * n.r.c[5]);
+		d4 = d1 * n.r.c[5] + d2 * n.i.c[5];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[5] = d5;
+		i.c[5] = d5;
 		r.c[5] = d6;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-		d2 = ::atan2(r.c[6], c.c[6]);
-		d3 = ::exp(d1 * n.c.c[6] - d2 * n.r.c[6]);
-		d4 = d1 * n.r.c[6] + d2 * n.c.c[6];
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], i.c[6]);
+		d3 = ::exp(d1 * n.i.c[6] - d2 * n.r.c[6]);
+		d4 = d1 * n.r.c[6] + d2 * n.i.c[6];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[6] = d5;
+		i.c[6] = d5;
 		r.c[6] = d6;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-		d2 = ::atan2(r.c[7], c.c[7]);
-		d3 = ::exp(d1 * n.c.c[7] - d2 * n.r.c[7]);
-		d4 = d1 * n.r.c[7] + d2 * n.c.c[7];
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], i.c[7]);
+		d3 = ::exp(d1 * n.i.c[7] - d2 * n.r.c[7]);
+		d4 = d1 * n.r.c[7] + d2 * n.i.c[7];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[7] = d5;
+		i.c[7] = d5;
 		r.c[7] = d6;
 		return this;
 	}
 
 
 	inline Array8Complex32 *pow(Complex32 n) {
-		float d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		float d2 = ::atan2(r.c[0], c.c[0]);
+		float d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		float d2 = ::atan2(r.c[0], i.c[0]);
 		float d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		float d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		float d5 = d3 * ::cos(d4);
 		float d6 = d3 * ::sin(d4);
-		c.c[0] = d5;
+		i.c[0] = d5;
 		r.c[0] = d6;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[1] = d5;
+		i.c[1] = d5;
 		r.c[1] = d6;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[2] = d5;
+		i.c[2] = d5;
 		r.c[2] = d6;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[3] = d5;
+		i.c[3] = d5;
 		r.c[3] = d6;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-		d2 = ::atan2(r.c[4], c.c[4]);
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], i.c[4]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[4] = d5;
+		i.c[4] = d5;
 		r.c[4] = d6;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-		d2 = ::atan2(r.c[5], c.c[5]);
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], i.c[5]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[5] = d5;
+		i.c[5] = d5;
 		r.c[5] = d6;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-		d2 = ::atan2(r.c[6], c.c[6]);
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], i.c[6]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[6] = d5;
+		i.c[6] = d5;
 		r.c[6] = d6;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-		d2 = ::atan2(r.c[7], c.c[7]);
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], i.c[7]);
 		d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 		d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 		d5 = d3 * ::cos(d4);
 		d6 = d3 * ::sin(d4);
-		c.c[7] = d5;
+		i.c[7] = d5;
 		r.c[7] = d6;
 		return this;
 	}
@@ -12985,83 +13212,83 @@ public:
 		float d5;
 		float d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			d3 = ::exp(d1 * n.c.c[0] - d2 * n.r.c[0]);
-			d4 = d1 * n.r.c[0] + d2 * n.c.c[0];
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
+			d4 = d1 * n.r.c[0] + d2 * n.i.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			d3 = ::exp(d1 * n.c.c[1] - d2 * n.r.c[1]);
-			d4 = d1 * n.r.c[1] + d2 * n.c.c[1];
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			d3 = ::exp(d1 * n.i.c[1] - d2 * n.r.c[1]);
+			d4 = d1 * n.r.c[1] + d2 * n.i.c[1];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			d3 = ::exp(d1 * n.c.c[2] - d2 * n.r.c[2]);
-			d4 = d1 * n.r.c[2] + d2 * n.c.c[2];
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			d3 = ::exp(d1 * n.i.c[2] - d2 * n.r.c[2]);
+			d4 = d1 * n.r.c[2] + d2 * n.i.c[2];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[2] = d5;
+			i.c[2] = d5;
 			r.c[2] = d6;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			d3 = ::exp(d1 * n.c.c[3] - d2 * n.r.c[3]);
-			d4 = d1 * n.r.c[3] + d2 * n.c.c[3];
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			d3 = ::exp(d1 * n.i.c[3] - d2 * n.r.c[3]);
+			d4 = d1 * n.r.c[3] + d2 * n.i.c[3];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[3] = d5;
+			i.c[3] = d5;
 			r.c[3] = d6;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-			d2 = ::atan2(r.c[4], c.c[4]);
-			d3 = ::exp(d1 * n.c.c[4] - d2 * n.r.c[4]);
-			d4 = d1 * n.r.c[4] + d2 * n.c.c[4];
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], i.c[4]);
+			d3 = ::exp(d1 * n.i.c[4] - d2 * n.r.c[4]);
+			d4 = d1 * n.r.c[4] + d2 * n.i.c[4];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[4] = d5;
+			i.c[4] = d5;
 			r.c[4] = d6;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-			d2 = ::atan2(r.c[5], c.c[5]);
-			d3 = ::exp(d1 * n.c.c[5] - d2 * n.r.c[5]);
-			d4 = d1 * n.r.c[5] + d2 * n.c.c[5];
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], i.c[5]);
+			d3 = ::exp(d1 * n.i.c[5] - d2 * n.r.c[5]);
+			d4 = d1 * n.r.c[5] + d2 * n.i.c[5];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[5] = d5;
+			i.c[5] = d5;
 			r.c[5] = d6;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-			d2 = ::atan2(r.c[6], c.c[6]);
-			d3 = ::exp(d1 * n.c.c[6] - d2 * n.r.c[6]);
-			d4 = d1 * n.r.c[6] + d2 * n.c.c[6];
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], i.c[6]);
+			d3 = ::exp(d1 * n.i.c[6] - d2 * n.r.c[6]);
+			d4 = d1 * n.r.c[6] + d2 * n.i.c[6];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[6] = d5;
+			i.c[6] = d5;
 			r.c[6] = d6;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-			d2 = ::atan2(r.c[7], c.c[7]);
-			d3 = ::exp(d1 * n.c.c[7] - d2 * n.r.c[7]);
-			d4 = d1 * n.r.c[7] + d2 * n.c.c[7];
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], i.c[7]);
+			d3 = ::exp(d1 * n.i.c[7] - d2 * n.r.c[7]);
+			d4 = d1 * n.r.c[7] + d2 * n.i.c[7];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[7] = d5;
+			i.c[7] = d5;
 			r.c[7] = d6;
 		}
 		return this;
@@ -13076,83 +13303,83 @@ public:
 		float d5;
 		float d6;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[0] = d5;
+			i.c[0] = d5;
 			r.c[0] = d6;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[1] = d5;
+			i.c[1] = d5;
 			r.c[1] = d6;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[2] = d5;
+			i.c[2] = d5;
 			r.c[2] = d6;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[3] = d5;
+			i.c[3] = d5;
 			r.c[3] = d6;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-			d2 = ::atan2(r.c[4], c.c[4]);
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], i.c[4]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[4] = d5;
+			i.c[4] = d5;
 			r.c[4] = d6;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-			d2 = ::atan2(r.c[5], c.c[5]);
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], i.c[5]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[5] = d5;
+			i.c[5] = d5;
 			r.c[5] = d6;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-			d2 = ::atan2(r.c[6], c.c[6]);
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], i.c[6]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[6] = d5;
+			i.c[6] = d5;
 			r.c[6] = d6;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-			d2 = ::atan2(r.c[7], c.c[7]);
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], i.c[7]);
 			d3 = ::exp(d1 * n.c.c[0] - d2 * n.c.c[1]);
 			d4 = d1 * n.c.c[1] + d2 * n.c.c[0];
 			d5 = d3 * ::cos(d4);
 			d6 = d3 * ::sin(d4);
-			c.c[7] = d5;
+			i.c[7] = d5;
 			r.c[7] = d6;
 		}
 		return this;
@@ -13162,52 +13389,52 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::exp(r.c[0]) * ::cos(c.c[0]);
-			d2 = ::exp(r.c[0]) * ::sin(c.c[0]);
+			d1 = ::exp(r.c[0]) * ::cos(i.c[0]);
+			d2 = ::exp(r.c[0]) * ::sin(i.c[0]);
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::exp(r.c[1]) * ::cos(c.c[1]);
-			d2 = ::exp(r.c[1]) * ::sin(c.c[1]);
+			d1 = ::exp(r.c[1]) * ::cos(i.c[1]);
+			d2 = ::exp(r.c[1]) * ::sin(i.c[1]);
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::exp(r.c[2]) * ::cos(c.c[2]);
-			d2 = ::exp(r.c[2]) * ::sin(c.c[2]);
+			d1 = ::exp(r.c[2]) * ::cos(i.c[2]);
+			d2 = ::exp(r.c[2]) * ::sin(i.c[2]);
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::exp(r.c[3]) * ::cos(c.c[3]);
-			d2 = ::exp(r.c[3]) * ::sin(c.c[3]);
+			d1 = ::exp(r.c[3]) * ::cos(i.c[3]);
+			d2 = ::exp(r.c[3]) * ::sin(i.c[3]);
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::exp(r.c[4]) * ::cos(c.c[4]);
-			d2 = ::exp(r.c[4]) * ::sin(c.c[4]);
+			d1 = ::exp(r.c[4]) * ::cos(i.c[4]);
+			d2 = ::exp(r.c[4]) * ::sin(i.c[4]);
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::exp(r.c[5]) * ::cos(c.c[5]);
-			d2 = ::exp(r.c[5]) * ::sin(c.c[5]);
+			d1 = ::exp(r.c[5]) * ::cos(i.c[5]);
+			d2 = ::exp(r.c[5]) * ::sin(i.c[5]);
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::exp(r.c[6]) * ::cos(c.c[6]);
-			d2 = ::exp(r.c[6]) * ::sin(c.c[6]);
+			d1 = ::exp(r.c[6]) * ::cos(i.c[6]);
+			d2 = ::exp(r.c[6]) * ::sin(i.c[6]);
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::exp(r.c[7]) * ::cos(c.c[7]);
-			d2 = ::exp(r.c[7]) * ::sin(c.c[7]);
+			d1 = ::exp(r.c[7]) * ::cos(i.c[7]);
+			d2 = ::exp(r.c[7]) * ::sin(i.c[7]);
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -13216,52 +13443,52 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(n, r.c[0]) * ::cos(c.c[0] * ::log(n));
-			d2 = ::pow(n, r.c[0]) * ::sin(c.c[0] * ::log(n));
+			d1 = ::pow(n, r.c[0]) * ::cos(i.c[0] * ::log(n));
+			d2 = ::pow(n, r.c[0]) * ::sin(i.c[0] * ::log(n));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(n, r.c[1]) * ::cos(c.c[1] * ::log(n));
-			d2 = ::pow(n, r.c[1]) * ::sin(c.c[1] * ::log(n));
+			d1 = ::pow(n, r.c[1]) * ::cos(i.c[1] * ::log(n));
+			d2 = ::pow(n, r.c[1]) * ::sin(i.c[1] * ::log(n));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::pow(n, r.c[2]) * ::cos(c.c[2] * ::log(n));
-			d2 = ::pow(n, r.c[2]) * ::sin(c.c[2] * ::log(n));
+			d1 = ::pow(n, r.c[2]) * ::cos(i.c[2] * ::log(n));
+			d2 = ::pow(n, r.c[2]) * ::sin(i.c[2] * ::log(n));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::pow(n, r.c[3]) * ::cos(c.c[3] * ::log(n));
-			d2 = ::pow(n, r.c[3]) * ::sin(c.c[3] * ::log(n));
+			d1 = ::pow(n, r.c[3]) * ::cos(i.c[3] * ::log(n));
+			d2 = ::pow(n, r.c[3]) * ::sin(i.c[3] * ::log(n));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::pow(n, r.c[4]) * ::cos(c.c[4] * ::log(n));
-			d2 = ::pow(n, r.c[4]) * ::sin(c.c[4] * ::log(n));
+			d1 = ::pow(n, r.c[4]) * ::cos(i.c[4] * ::log(n));
+			d2 = ::pow(n, r.c[4]) * ::sin(i.c[4] * ::log(n));
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::pow(n, r.c[5]) * ::cos(c.c[5] * ::log(n));
-			d2 = ::pow(n, r.c[5]) * ::sin(c.c[5] * ::log(n));
+			d1 = ::pow(n, r.c[5]) * ::cos(i.c[5] * ::log(n));
+			d2 = ::pow(n, r.c[5]) * ::sin(i.c[5] * ::log(n));
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::pow(n, r.c[6]) * ::cos(c.c[6] * ::log(n));
-			d2 = ::pow(n, r.c[6]) * ::sin(c.c[6] * ::log(n));
+			d1 = ::pow(n, r.c[6]) * ::cos(i.c[6] * ::log(n));
+			d2 = ::pow(n, r.c[6]) * ::sin(i.c[6] * ::log(n));
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::pow(n, r.c[7]) * ::cos(c.c[7] * ::log(n));
-			d2 = ::pow(n, r.c[7]) * ::sin(c.c[7] * ::log(n));
+			d1 = ::pow(n, r.c[7]) * ::cos(i.c[7] * ::log(n));
+			d2 = ::pow(n, r.c[7]) * ::sin(i.c[7] * ::log(n));
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
@@ -13269,38 +13496,38 @@ public:
 	inline Array8Complex32 *pow(float n) {
 		float d1;
 		float d2;
-		d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-		d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+		d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+		d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 		r.c[0] = d1;
-		c.c[0] = d2;
-		d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-		d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+		i.c[0] = d2;
+		d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+		d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 		r.c[1] = d1;
-		c.c[1] = d2;
-		d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
-		d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+		i.c[1] = d2;
+		d1 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::cos(n * atan2(i.c[2], r.c[2]));
+		d2 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::sin(n * atan2(i.c[2], r.c[2]));
 		r.c[2] = d1;
-		c.c[2] = d2;
-		d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
-		d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+		i.c[2] = d2;
+		d1 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::cos(n * atan2(i.c[3], r.c[3]));
+		d2 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::sin(n * atan2(i.c[3], r.c[3]));
 		r.c[3] = d1;
-		c.c[3] = d2;
-		d1 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::cos(n * atan2(c.c[4], r.c[4]));
-		d2 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::sin(n * atan2(c.c[4], r.c[4]));
+		i.c[3] = d2;
+		d1 = ::pow(r.c[4] * r.c[4] + i.c[4] * i.c[4], n / 2) * ::cos(n * atan2(i.c[4], r.c[4]));
+		d2 = ::pow(r.c[4] * r.c[4] + i.c[4] * i.c[4], n / 2) * ::sin(n * atan2(i.c[4], r.c[4]));
 		r.c[4] = d1;
-		c.c[4] = d2;
-		d1 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::cos(n * atan2(c.c[5], r.c[5]));
-		d2 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::sin(n * atan2(c.c[5], r.c[5]));
+		i.c[4] = d2;
+		d1 = ::pow(r.c[5] * r.c[5] + i.c[5] * i.c[5], n / 2) * ::cos(n * atan2(i.c[5], r.c[5]));
+		d2 = ::pow(r.c[5] * r.c[5] + i.c[5] * i.c[5], n / 2) * ::sin(n * atan2(i.c[5], r.c[5]));
 		r.c[5] = d1;
-		c.c[5] = d2;
-		d1 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::cos(n * atan2(c.c[6], r.c[6]));
-		d2 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::sin(n * atan2(c.c[6], r.c[6]));
+		i.c[5] = d2;
+		d1 = ::pow(r.c[6] * r.c[6] + i.c[6] * i.c[6], n / 2) * ::cos(n * atan2(i.c[6], r.c[6]));
+		d2 = ::pow(r.c[6] * r.c[6] + i.c[6] * i.c[6], n / 2) * ::sin(n * atan2(i.c[6], r.c[6]));
 		r.c[6] = d1;
-		c.c[6] = d2;
-		d1 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::cos(n * atan2(c.c[7], r.c[7]));
-		d2 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::sin(n * atan2(c.c[7], r.c[7]));
+		i.c[6] = d2;
+		d1 = ::pow(r.c[7] * r.c[7] + i.c[7] * i.c[7], n / 2) * ::cos(n * atan2(i.c[7], r.c[7]));
+		d2 = ::pow(r.c[7] * r.c[7] + i.c[7] * i.c[7], n / 2) * ::sin(n * atan2(i.c[7], r.c[7]));
 		r.c[7] = d1;
-		c.c[7] = d2;
+		i.c[7] = d2;
 
 		return this;
 	}
@@ -13309,105 +13536,105 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::cos(n * atan2(c.c[0], r.c[0]));
-			d2 = ::pow(r.c[0] * r.c[0] + c.c[0] * c.c[0], n / 2) * ::sin(n * atan2(c.c[0], r.c[0]));
+			d1 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::cos(n * atan2(i.c[0], r.c[0]));
+			d2 = ::pow(r.c[0] * r.c[0] + i.c[0] * i.c[0], n / 2) * ::sin(n * atan2(i.c[0], r.c[0]));
 			r.c[0] = d1;
-			c.c[0] = d2;
+			i.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::cos(n * atan2(c.c[1], r.c[1]));
-			d2 = ::pow(r.c[1] * r.c[1] + c.c[1] * c.c[1], n / 2) * ::sin(n * atan2(c.c[1], r.c[1]));
+			d1 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::cos(n * atan2(i.c[1], r.c[1]));
+			d2 = ::pow(r.c[1] * r.c[1] + i.c[1] * i.c[1], n / 2) * ::sin(n * atan2(i.c[1], r.c[1]));
 			r.c[1] = d1;
-			c.c[1] = d2;
+			i.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::cos(n * atan2(c.c[2], r.c[2]));
-			d2 = ::pow(r.c[2] * r.c[2] + c.c[2] * c.c[2], n / 2) * ::sin(n * atan2(c.c[2], r.c[2]));
+			d1 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::cos(n * atan2(i.c[2], r.c[2]));
+			d2 = ::pow(r.c[2] * r.c[2] + i.c[2] * i.c[2], n / 2) * ::sin(n * atan2(i.c[2], r.c[2]));
 			r.c[2] = d1;
-			c.c[2] = d2;
+			i.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::cos(n * atan2(c.c[3], r.c[3]));
-			d2 = ::pow(r.c[3] * r.c[3] + c.c[3] * c.c[3], n / 2) * ::sin(n * atan2(c.c[3], r.c[3]));
+			d1 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::cos(n * atan2(i.c[3], r.c[3]));
+			d2 = ::pow(r.c[3] * r.c[3] + i.c[3] * i.c[3], n / 2) * ::sin(n * atan2(i.c[3], r.c[3]));
 			r.c[3] = d1;
-			c.c[3] = d2;
+			i.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::cos(n * atan2(c.c[4], r.c[4]));
-			d2 = ::pow(r.c[4] * r.c[4] + c.c[4] * c.c[4], n / 2) * ::sin(n * atan2(c.c[4], r.c[4]));
+			d1 = ::pow(r.c[4] * r.c[4] + i.c[4] * i.c[4], n / 2) * ::cos(n * atan2(i.c[4], r.c[4]));
+			d2 = ::pow(r.c[4] * r.c[4] + i.c[4] * i.c[4], n / 2) * ::sin(n * atan2(i.c[4], r.c[4]));
 			r.c[4] = d1;
-			c.c[4] = d2;
+			i.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::cos(n * atan2(c.c[5], r.c[5]));
-			d2 = ::pow(r.c[5] * r.c[5] + c.c[5] * c.c[5], n / 2) * ::sin(n * atan2(c.c[5], r.c[5]));
+			d1 = ::pow(r.c[5] * r.c[5] + i.c[5] * i.c[5], n / 2) * ::cos(n * atan2(i.c[5], r.c[5]));
+			d2 = ::pow(r.c[5] * r.c[5] + i.c[5] * i.c[5], n / 2) * ::sin(n * atan2(i.c[5], r.c[5]));
 			r.c[5] = d1;
-			c.c[5] = d2;
+			i.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::cos(n * atan2(c.c[6], r.c[6]));
-			d2 = ::pow(r.c[6] * r.c[6] + c.c[6] * c.c[6], n / 2) * ::sin(n * atan2(c.c[6], r.c[6]));
+			d1 = ::pow(r.c[6] * r.c[6] + i.c[6] * i.c[6], n / 2) * ::cos(n * atan2(i.c[6], r.c[6]));
+			d2 = ::pow(r.c[6] * r.c[6] + i.c[6] * i.c[6], n / 2) * ::sin(n * atan2(i.c[6], r.c[6]));
 			r.c[6] = d1;
-			c.c[6] = d2;
+			i.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::cos(n * atan2(c.c[7], r.c[7]));
-			d2 = ::pow(r.c[7] * r.c[7] + c.c[7] * c.c[7], n / 2) * ::sin(n * atan2(c.c[7], r.c[7]));
+			d1 = ::pow(r.c[7] * r.c[7] + i.c[7] * i.c[7], n / 2) * ::cos(n * atan2(i.c[7], r.c[7]));
+			d2 = ::pow(r.c[7] * r.c[7] + i.c[7] * i.c[7], n / 2) * ::sin(n * atan2(i.c[7], r.c[7]));
 			r.c[7] = d1;
-			c.c[7] = d2;
+			i.c[7] = d2;
 		}
 		return this;
 	}
 
 	inline VectorFloat8D abs() {
 		VectorFloat8D ret;
-		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + c.c[0] * c.c[0]);
-		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + c.c[1] * c.c[1]);
-		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + c.c[2] * c.c[2]);
-		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + c.c[3] * c.c[3]);
-		ret.v.c[4] = ::sqrt(r.c[4] * r.c[4] + c.c[4] * c.c[4]);
-		ret.v.c[5] = ::sqrt(r.c[5] * r.c[5] + c.c[5] * c.c[5]);
-		ret.v.c[6] = ::sqrt(r.c[6] * r.c[6] + c.c[6] * c.c[6]);
-		ret.v.c[7] = ::sqrt(r.c[7] * r.c[7] + c.c[7] * c.c[7]);
+		ret.v.c[0] = ::sqrt(r.c[0] * r.c[0] + i.c[0] * i.c[0]);
+		ret.v.c[1] = ::sqrt(r.c[1] * r.c[1] + i.c[1] * i.c[1]);
+		ret.v.c[2] = ::sqrt(r.c[2] * r.c[2] + i.c[2] * i.c[2]);
+		ret.v.c[3] = ::sqrt(r.c[3] * r.c[3] + i.c[3] * i.c[3]);
+		ret.v.c[4] = ::sqrt(r.c[4] * r.c[4] + i.c[4] * i.c[4]);
+		ret.v.c[5] = ::sqrt(r.c[5] * r.c[5] + i.c[5] * i.c[5]);
+		ret.v.c[6] = ::sqrt(r.c[6] * r.c[6] + i.c[6] * i.c[6]);
+		ret.v.c[7] = ::sqrt(r.c[7] * r.c[7] + i.c[7] * i.c[7]);
 		return ret;
 	}
 
 	inline VectorU8_8D abs_gt(float a) {
 		VectorU8_8D ret;
-		ret.v.c[0] = a * a < r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a < r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a < r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a < r.c[3] * r.c[3] + c.c[3] * c.c[3];
-		ret.v.c[4] = a * a < r.c[4] * r.c[4] + c.c[4] * c.c[4];
-		ret.v.c[5] = a * a < r.c[5] * r.c[5] + c.c[5] * c.c[5];
-		ret.v.c[6] = a * a < r.c[6] * r.c[6] + c.c[6] * c.c[6];
-		ret.v.c[7] = a * a < r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		ret.v.c[0] = a * a < r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a < r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a < r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a < r.c[3] * r.c[3] + i.c[3] * i.c[3];
+		ret.v.c[4] = a * a < r.c[4] * r.c[4] + i.c[4] * i.c[4];
+		ret.v.c[5] = a * a < r.c[5] * r.c[5] + i.c[5] * i.c[5];
+		ret.v.c[6] = a * a < r.c[6] * r.c[6] + i.c[6] * i.c[6];
+		ret.v.c[7] = a * a < r.c[7] * r.c[7] + i.c[7] * i.c[7];
 		return ret;
 	}
 
 	inline VectorU8_8D abs_lt(float a) {
 		VectorU8_8D ret;
-		ret.v.c[0] = a * a > r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a > r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a > r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a > r.c[3] * r.c[3] + c.c[3] * c.c[3];
-		ret.v.c[4] = a * a > r.c[4] * r.c[4] + c.c[4] * c.c[4];
-		ret.v.c[5] = a * a > r.c[5] * r.c[5] + c.c[5] * c.c[5];
-		ret.v.c[6] = a * a > r.c[6] * r.c[6] + c.c[6] * c.c[6];
-		ret.v.c[7] = a * a > r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		ret.v.c[0] = a * a > r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a > r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a > r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a > r.c[3] * r.c[3] + i.c[3] * i.c[3];
+		ret.v.c[4] = a * a > r.c[4] * r.c[4] + i.c[4] * i.c[4];
+		ret.v.c[5] = a * a > r.c[5] * r.c[5] + i.c[5] * i.c[5];
+		ret.v.c[6] = a * a > r.c[6] * r.c[6] + i.c[6] * i.c[6];
+		ret.v.c[7] = a * a > r.c[7] * r.c[7] + i.c[7] * i.c[7];
 		return ret;
 	}
 
 	inline VectorU8_8D abs_eq(float a) {
 		VectorU8_8D ret;
-		ret.v.c[0] = a * a == r.c[0] * r.c[0] + c.c[0] * c.c[0];
-		ret.v.c[1] = a * a == r.c[1] * r.c[1] + c.c[1] * c.c[1];
-		ret.v.c[2] = a * a == r.c[2] * r.c[2] + c.c[2] * c.c[2];
-		ret.v.c[3] = a * a == r.c[3] * r.c[3] + c.c[3] * c.c[3];
-		ret.v.c[4] = a * a == r.c[4] * r.c[4] + c.c[4] * c.c[4];
-		ret.v.c[5] = a * a == r.c[5] * r.c[5] + c.c[5] * c.c[5];
-		ret.v.c[6] = a * a == r.c[6] * r.c[6] + c.c[6] * c.c[6];
-		ret.v.c[7] = a * a == r.c[7] * r.c[7] + c.c[7] * c.c[7];
+		ret.v.c[0] = a * a == r.c[0] * r.c[0] + i.c[0] * i.c[0];
+		ret.v.c[1] = a * a == r.c[1] * r.c[1] + i.c[1] * i.c[1];
+		ret.v.c[2] = a * a == r.c[2] * r.c[2] + i.c[2] * i.c[2];
+		ret.v.c[3] = a * a == r.c[3] * r.c[3] + i.c[3] * i.c[3];
+		ret.v.c[4] = a * a == r.c[4] * r.c[4] + i.c[4] * i.c[4];
+		ret.v.c[5] = a * a == r.c[5] * r.c[5] + i.c[5] * i.c[5];
+		ret.v.c[6] = a * a == r.c[6] * r.c[6] + i.c[6] * i.c[6];
+		ret.v.c[7] = a * a == r.c[7] * r.c[7] + i.c[7] * i.c[7];
 		return ret;
 	}
 
@@ -13415,51 +13642,51 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-			d2 = ::atan2(r.c[4], c.c[4]);
-			c.c[4] = d1;
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], i.c[4]);
+			i.c[4] = d1;
 			r.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-			d2 = ::atan2(r.c[5], c.c[5]);
-			c.c[5] = d1;
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], i.c[5]);
+			i.c[5] = d1;
 			r.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-			d2 = ::atan2(r.c[6], c.c[6]);
-			c.c[6] = d1;
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], i.c[6]);
+			i.c[6] = d1;
 			r.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-			d2 = ::atan2(r.c[7], c.c[7]);
-			c.c[7] = d1;
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], i.c[7]);
+			i.c[7] = d1;
 			r.c[7] = d2;
 		}
 		return this;
@@ -13469,51 +13696,51 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-			d2 = ::atan2(r.c[0], c.c[0]);
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+			d2 = ::atan2(r.c[0], i.c[0]);
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-			d2 = ::atan2(r.c[1], c.c[1]);
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+			d2 = ::atan2(r.c[1], i.c[1]);
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-			d2 = ::atan2(r.c[2], c.c[2]);
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+			d2 = ::atan2(r.c[2], i.c[2]);
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-			d2 = ::atan2(r.c[3], c.c[3]);
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+			d2 = ::atan2(r.c[3], i.c[3]);
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-			d2 = ::atan2(r.c[4], c.c[4]);
-			c.c[4] = d1;
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+			d2 = ::atan2(r.c[4], i.c[4]);
+			i.c[4] = d1;
 			r.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-			d2 = ::atan2(r.c[5], c.c[5]);
-			c.c[5] = d1;
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+			d2 = ::atan2(r.c[5], i.c[5]);
+			i.c[5] = d1;
 			r.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-			d2 = ::atan2(r.c[6], c.c[6]);
-			c.c[6] = d1;
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+			d2 = ::atan2(r.c[6], i.c[6]);
+			i.c[6] = d1;
 			r.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-			d2 = ::atan2(r.c[7], c.c[7]);
-			c.c[7] = d1;
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+			d2 = ::atan2(r.c[7], i.c[7]);
+			i.c[7] = d1;
 			r.c[7] = d2;
 		}
 		return this;
@@ -13523,51 +13750,51 @@ public:
 		float d1;
 		float d2;
 		if (mask.v.c[0]) {
-			d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-			c.c[0] = d1;
+			d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+			i.c[0] = d1;
 			r.c[0] = d2;
 		}
 		if (mask.v.c[1]) {
-			d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-			c.c[1] = d1;
+			d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+			i.c[1] = d1;
 			r.c[1] = d2;
 		}
 		if (mask.v.c[2]) {
-			d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
-			c.c[2] = d1;
+			d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[2], i.c[2]) / AML_LN10;
+			i.c[2] = d1;
 			r.c[2] = d2;
 		}
 		if (mask.v.c[3]) {
-			d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
-			c.c[3] = d1;
+			d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[3], i.c[3]) / AML_LN10;
+			i.c[3] = d1;
 			r.c[3] = d2;
 		}
 		if (mask.v.c[4]) {
-			d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[4], c.c[4]) / AML_LN10;
-			c.c[4] = d1;
+			d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[4], i.c[4]) / AML_LN10;
+			i.c[4] = d1;
 			r.c[4] = d2;
 		}
 		if (mask.v.c[5]) {
-			d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[5], c.c[5]) / AML_LN10;
-			c.c[5] = d1;
+			d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[5], i.c[5]) / AML_LN10;
+			i.c[5] = d1;
 			r.c[5] = d2;
 		}
 		if (mask.v.c[6]) {
-			d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[6], c.c[6]) / AML_LN10;
-			c.c[6] = d1;
+			d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[6], i.c[6]) / AML_LN10;
+			i.c[6] = d1;
 			r.c[6] = d2;
 		}
 		if (mask.v.c[7]) {
-			d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
-			d2 = ::atan2(r.c[7], c.c[7]) / AML_LN10;
-			c.c[7] = d1;
+			d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
+			d2 = ::atan2(r.c[7], i.c[7]) / AML_LN10;
+			i.c[7] = d1;
 			r.c[7] = d2;
 		}
 		return this;
@@ -13576,37 +13803,37 @@ public:
 	inline Array8Complex32 *ln() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		i.c[3] = d1;
 		r.c[3] = d2;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-		d2 = ::atan2(r.c[4], c.c[4]);
-		c.c[4] = d1;
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], i.c[4]);
+		i.c[4] = d1;
 		r.c[4] = d2;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-		d2 = ::atan2(r.c[5], c.c[5]);
-		c.c[5] = d1;
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], i.c[5]);
+		i.c[5] = d1;
 		r.c[5] = d2;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-		d2 = ::atan2(r.c[6], c.c[6]);
-		c.c[6] = d1;
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], i.c[6]);
+		i.c[6] = d1;
 		r.c[6] = d2;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-		d2 = ::atan2(r.c[7], c.c[7]);
-		c.c[7] = d1;
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], i.c[7]);
+		i.c[7] = d1;
 		r.c[7] = d2;
 		return this;
 	}
@@ -13614,37 +13841,37 @@ public:
 	inline Array8Complex32 *log() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / 2;
-		d2 = ::atan2(r.c[0], c.c[0]);
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
+		d2 = ::atan2(r.c[0], i.c[0]);
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / 2;
-		d2 = ::atan2(r.c[1], c.c[1]);
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / 2;
+		d2 = ::atan2(r.c[1], i.c[1]);
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / 2;
-		d2 = ::atan2(r.c[2], c.c[2]);
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / 2;
+		d2 = ::atan2(r.c[2], i.c[2]);
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / 2;
-		d2 = ::atan2(r.c[3], c.c[3]);
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / 2;
+		d2 = ::atan2(r.c[3], i.c[3]);
+		i.c[3] = d1;
 		r.c[3] = d2;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / 2;
-		d2 = ::atan2(r.c[4], c.c[4]);
-		c.c[4] = d1;
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / 2;
+		d2 = ::atan2(r.c[4], i.c[4]);
+		i.c[4] = d1;
 		r.c[4] = d2;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / 2;
-		d2 = ::atan2(r.c[5], c.c[5]);
-		c.c[5] = d1;
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / 2;
+		d2 = ::atan2(r.c[5], i.c[5]);
+		i.c[5] = d1;
 		r.c[5] = d2;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / 2;
-		d2 = ::atan2(r.c[6], c.c[6]);
-		c.c[6] = d1;
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / 2;
+		d2 = ::atan2(r.c[6], i.c[6]);
+		i.c[6] = d1;
 		r.c[6] = d2;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / 2;
-		d2 = ::atan2(r.c[7], c.c[7]);
-		c.c[7] = d1;
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / 2;
+		d2 = ::atan2(r.c[7], i.c[7]);
+		i.c[7] = d1;
 		r.c[7] = d2;
 		return this;
 	}
@@ -13652,37 +13879,37 @@ public:
 	inline Array8Complex32 *log10() {
 		float d1;
 		float d2;
-		d1 = ::log(c.c[0] * c.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[0], c.c[0]) / AML_LN10;
-		c.c[0] = d1;
+		d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[0], i.c[0]) / AML_LN10;
+		i.c[0] = d1;
 		r.c[0] = d2;
-		d1 = ::log(c.c[1] * c.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[1], c.c[1]) / AML_LN10;
-		c.c[1] = d1;
+		d1 = ::log(i.c[1] * i.c[1] + r.c[1] * r.c[1]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[1], i.c[1]) / AML_LN10;
+		i.c[1] = d1;
 		r.c[1] = d2;
-		d1 = ::log(c.c[2] * c.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[2], c.c[2]) / AML_LN10;
-		c.c[2] = d1;
+		d1 = ::log(i.c[2] * i.c[2] + r.c[2] * r.c[2]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[2], i.c[2]) / AML_LN10;
+		i.c[2] = d1;
 		r.c[2] = d2;
-		d1 = ::log(c.c[3] * c.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[3], c.c[3]) / AML_LN10;
-		c.c[3] = d1;
+		d1 = ::log(i.c[3] * i.c[3] + r.c[3] * r.c[3]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[3], i.c[3]) / AML_LN10;
+		i.c[3] = d1;
 		r.c[3] = d2;
-		d1 = ::log(c.c[4] * c.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[4], c.c[4]) / AML_LN10;
-		c.c[4] = d1;
+		d1 = ::log(i.c[4] * i.c[4] + r.c[4] * r.c[4]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[4], i.c[4]) / AML_LN10;
+		i.c[4] = d1;
 		r.c[4] = d2;
-		d1 = ::log(c.c[5] * c.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[5], c.c[5]) / AML_LN10;
-		c.c[5] = d1;
+		d1 = ::log(i.c[5] * i.c[5] + r.c[5] * r.c[5]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[5], i.c[5]) / AML_LN10;
+		i.c[5] = d1;
 		r.c[5] = d2;
-		d1 = ::log(c.c[6] * c.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[6], c.c[6]) / AML_LN10;
-		c.c[6] = d1;
+		d1 = ::log(i.c[6] * i.c[6] + r.c[6] * r.c[6]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[6], i.c[6]) / AML_LN10;
+		i.c[6] = d1;
 		r.c[6] = d2;
-		d1 = ::log(c.c[7] * c.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
-		d2 = ::atan2(r.c[7], c.c[7]) / AML_LN10;
-		c.c[7] = d1;
+		d1 = ::log(i.c[7] * i.c[7] + r.c[7] * r.c[7]) / (2 * AML_LN10);
+		d2 = ::atan2(r.c[7], i.c[7]) / AML_LN10;
+		i.c[7] = d1;
 		r.c[7] = d2;
 		return this;
 	}
@@ -13692,19 +13919,19 @@ public:
 
 inline std::string operator<<(std::string &lhs, const Array8Complex32 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
-		   << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
-		   << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i ,  "
+		   << rhs.r.c[4] << " + " << rhs.i.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.i.c[5] << "i ,  " << rhs.r.c[6]
+		   << " + " << rhs.i.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.i.c[7] << "i }";
 	return string.str();
 }
 
 inline std::string operator<<(const char *lhs, const Array8Complex32 &rhs) {
 	std::ostringstream string;
-	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-		   << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
-		   << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
-		   << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	string << lhs << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+		   << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i ,  "
+		   << rhs.r.c[4] << " + " << rhs.i.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.i.c[5] << "i ,  " << rhs.r.c[6]
+		   << " + " << rhs.i.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.i.c[7] << "i }";
 	return string.str();
 }
 
@@ -13715,10 +13942,10 @@ operator<<(std::basic_ostream<charT, traits> &o, const Array8Complex32 &rhs) {
 	s.flags(o.flags());
 	s.imbue(o.getloc());
 	s.precision(o.precision());
-	s << "{ " << rhs.r.c[0] << " + " << rhs.c.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.c.c[1]
-	  << "i ,  " << rhs.r.c[2] << " + " << rhs.c.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.c.c[3] << "i ,  "
-	  << rhs.r.c[4] << " + " << rhs.c.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.c.c[5] << "i ,  " << rhs.r.c[6]
-	  << " + " << rhs.c.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.c.c[7] << "i }";
+	s << "{ " << rhs.r.c[0] << " + " << rhs.i.c[0] << "i ,  " << rhs.r.c[1] << " + " << rhs.i.c[1]
+	  << "i ,  " << rhs.r.c[2] << " + " << rhs.i.c[2] << "i ,  " << rhs.r.c[3] << " + " << rhs.i.c[3] << "i ,  "
+	  << rhs.r.c[4] << " + " << rhs.i.c[4] << "i ,  " << rhs.r.c[5] << " + " << rhs.i.c[5] << "i ,  " << rhs.r.c[6]
+	  << " + " << rhs.i.c[6] << "i ,  " << rhs.r.c[7] << " + " << rhs.i.c[7] << "i }";
 	return o << s.str();
 }
 
@@ -13729,14 +13956,14 @@ inline Array8Complex32 operator+(const Complex32 &lhs, const Array8Complex32 &rh
 
 inline Array8Complex32 operator-(const Complex32 &lhs, const Array8Complex32 &rhs) {
 	Array8Complex32 ret;
-	ret.c.c[0] = lhs.c.c[1] - rhs.c.c[0];
-	ret.c.c[1] = lhs.c.c[1] - rhs.c.c[1];
-	ret.c.c[2] = lhs.c.c[1] - rhs.c.c[2];
-	ret.c.c[3] = lhs.c.c[1] - rhs.c.c[3];
-	ret.c.c[4] = lhs.c.c[1] - rhs.c.c[4];
-	ret.c.c[5] = lhs.c.c[1] - rhs.c.c[5];
-	ret.c.c[6] = lhs.c.c[1] - rhs.c.c[6];
-	ret.c.c[7] = lhs.c.c[1] - rhs.c.c[7];
+	ret.i.c[0] = lhs.c.c[1] - rhs.i.c[0];
+	ret.i.c[1] = lhs.c.c[1] - rhs.i.c[1];
+	ret.i.c[2] = lhs.c.c[1] - rhs.i.c[2];
+	ret.i.c[3] = lhs.c.c[1] - rhs.i.c[3];
+	ret.i.c[4] = lhs.c.c[1] - rhs.i.c[4];
+	ret.i.c[5] = lhs.c.c[1] - rhs.i.c[5];
+	ret.i.c[6] = lhs.c.c[1] - rhs.i.c[6];
+	ret.i.c[7] = lhs.c.c[1] - rhs.i.c[7];
 	ret.r.c[0] = lhs.c.c[0] - rhs.r.c[0];
 	ret.r.c[1] = lhs.c.c[0] - rhs.r.c[1];
 	ret.r.c[2] = lhs.c.c[0] - rhs.r.c[2];
@@ -13755,39 +13982,39 @@ inline Array8Complex32 operator*(const Complex32 &lhs, const Array8Complex32 &rh
 inline Array8Complex32 operator/(const Complex32 &lhs, const Array8Complex32 &rhs) {
 	Array8Complex32 ret;
 	float d1 =
-			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[0] * rhs.r.c[0] + lhs.c.c[1] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	float d2 =
-			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.c.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.c.c[0] * rhs.c.c[0]);
+			(lhs.c.c[1] * rhs.r.c[0] - lhs.c.c[0] * rhs.i.c[0]) / (rhs.r.c[0] * rhs.r.c[0] + rhs.i.c[0] * rhs.i.c[0]);
 	ret.r.c[0] = d1;
-	ret.c.c[0] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
-	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.c.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.c.c[1] * rhs.c.c[1]);
+	ret.i.c[0] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[1] + lhs.c.c[1] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
+	d2 = (lhs.c.c[1] * rhs.r.c[1] - lhs.c.c[0] * rhs.i.c[1]) / (rhs.r.c[1] * rhs.r.c[1] + rhs.i.c[1] * rhs.i.c[1]);
 	ret.r.c[1] = d1;
-	ret.c.c[1] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
-	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.c.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.c.c[2] * rhs.c.c[2]);
+	ret.i.c[1] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[2] + lhs.c.c[1] * rhs.i.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.i.c[2] * rhs.i.c[2]);
+	d2 = (lhs.c.c[1] * rhs.r.c[2] - lhs.c.c[0] * rhs.i.c[2]) / (rhs.r.c[2] * rhs.r.c[2] + rhs.i.c[2] * rhs.i.c[2]);
 	ret.r.c[2] = d1;
-	ret.c.c[2] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
-	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.c.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.c.c[3] * rhs.c.c[3]);
+	ret.i.c[2] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[3] + lhs.c.c[1] * rhs.i.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.i.c[3] * rhs.i.c[3]);
+	d2 = (lhs.c.c[1] * rhs.r.c[3] - lhs.c.c[0] * rhs.i.c[3]) / (rhs.r.c[3] * rhs.r.c[3] + rhs.i.c[3] * rhs.i.c[3]);
 	ret.r.c[3] = d1;
-	ret.c.c[3] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[4] + lhs.c.c[1] * rhs.c.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.c.c[4] * rhs.c.c[4]);
-	d2 = (lhs.c.c[1] * rhs.r.c[4] - lhs.c.c[0] * rhs.c.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.c.c[4] * rhs.c.c[4]);
+	ret.i.c[3] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[4] + lhs.c.c[1] * rhs.i.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.i.c[4] * rhs.i.c[4]);
+	d2 = (lhs.c.c[1] * rhs.r.c[4] - lhs.c.c[0] * rhs.i.c[4]) / (rhs.r.c[4] * rhs.r.c[4] + rhs.i.c[4] * rhs.i.c[4]);
 	ret.r.c[4] = d1;
-	ret.c.c[4] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[5] + lhs.c.c[1] * rhs.c.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.c.c[5] * rhs.c.c[5]);
-	d2 = (lhs.c.c[1] * rhs.r.c[5] - lhs.c.c[0] * rhs.c.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.c.c[5] * rhs.c.c[5]);
+	ret.i.c[4] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[5] + lhs.c.c[1] * rhs.i.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.i.c[5] * rhs.i.c[5]);
+	d2 = (lhs.c.c[1] * rhs.r.c[5] - lhs.c.c[0] * rhs.i.c[5]) / (rhs.r.c[5] * rhs.r.c[5] + rhs.i.c[5] * rhs.i.c[5]);
 	ret.r.c[5] = d1;
-	ret.c.c[5] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[6] + lhs.c.c[1] * rhs.c.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.c.c[6] * rhs.c.c[6]);
-	d2 = (lhs.c.c[1] * rhs.r.c[6] - lhs.c.c[0] * rhs.c.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.c.c[6] * rhs.c.c[6]);
+	ret.i.c[5] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[6] + lhs.c.c[1] * rhs.i.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.i.c[6] * rhs.i.c[6]);
+	d2 = (lhs.c.c[1] * rhs.r.c[6] - lhs.c.c[0] * rhs.i.c[6]) / (rhs.r.c[6] * rhs.r.c[6] + rhs.i.c[6] * rhs.i.c[6]);
 	ret.r.c[6] = d1;
-	ret.c.c[6] = d2;
-	d1 = (lhs.c.c[0] * rhs.r.c[7] + lhs.c.c[1] * rhs.c.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.c.c[7] * rhs.c.c[7]);
-	d2 = (lhs.c.c[1] * rhs.r.c[7] - lhs.c.c[0] * rhs.c.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.c.c[7] * rhs.c.c[7]);
+	ret.i.c[6] = d2;
+	d1 = (lhs.c.c[0] * rhs.r.c[7] + lhs.c.c[1] * rhs.i.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.i.c[7] * rhs.i.c[7]);
+	d2 = (lhs.c.c[1] * rhs.r.c[7] - lhs.c.c[0] * rhs.i.c[7]) / (rhs.r.c[7] * rhs.r.c[7] + rhs.i.c[7] * rhs.i.c[7]);
 	ret.r.c[7] = d1;
-	ret.c.c[7] = d2;
+	ret.i.c[7] = d2;
 	return ret;
 }
 

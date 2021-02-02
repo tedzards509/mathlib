@@ -1,12 +1,16 @@
 //
 // Created by af on 26.01.21.
 //
+
+
+#define AML_USE_ARRAY_STRICT
 #define AML_USE_STD_COMPLEX
 
 #include <stdint.h>
 #include "../amathlib.h"
 #include <iostream>
 #include <chrono>
+
 /*
  * This sample shows how to implement the mandelbrot set in C++. It is implemented in two ways a fast and a slow one.
  * It is recommended to know what the mandelbrot set is, not only because it makes it easy to follow, but because it is a
@@ -83,11 +87,11 @@ int main() {
 	begin = getTime();
 	for (int x = 0; x < height; x++) {
 		for (int y = 0; y < width; y++) {
-			Complex64 c(((double) x) / ((double) height / 2.0f) - 1.5f, ((double) y) / ((double) width / 2.0f) - 1.0f);
+			Complex64 c = {((double) x) / ((double) height / 2.0f) - 1.5f,
+						   ((double) y) / ((double) width / 2.0f) - 1.0f};
 			Complex64 z = c;
-			int i = 0;
 			int result = accuracy;
-			for (; i < accuracy; ++i) {
+			for (int i = 0; i < accuracy; ++i) {
 				z = z * z + c;
 				if (z.abs_gt(2)) {
 					result = i;
@@ -112,11 +116,10 @@ int main() {
 		for (int y = 0; y < width / IDEAL_COMPLEX_64_SIZE; y++) {
 			IDEAL_COMPLEX_64_TYPE complex64_C;
 			IDEAL_COMPLEX_64_TYPE complex64_Z;
-			for (int index = 0; index < IDEAL_COMPLEX_64_SIZE; index++) {
-				complex64_C.set(index, Complex64(AML::mapLinear((double) x, 0.0, (double) height, -1.5, 0.5),
-												 AML::mapLinear((double) y * IDEAL_COMPLEX_64_SIZE + index, 0.0,
-																(double) width,
-																-1.0, 1.0)));
+			for (Complex64Ptr c_ptr : complex64_C) {
+				*c_ptr = {AML::mapLinear((double) x, 0.0, (double) height, -1.5, 0.5),
+						  AML::mapLinear((double) y * IDEAL_COMPLEX_64_SIZE + c_ptr.getIndex(), 0.0, (double) width,
+										 -1.0, 1.0)};
 			}
 			complex64_Z = complex64_C;
 			IDEAL_COMPLEX_64_VECTOR_TYPE result(accuracy);

@@ -6,6 +6,71 @@
 
 #include "amathlib.h"
 #include <iostream>
+#include <algorithm>
+
+class ARRAY {
+	class Complex64Itr : public std::iterator<
+			std::input_iterator_tag,   // iterator_category
+			Complex64Ptr,                      // value_type
+			long,                      // difference_type
+			const Complex64Ptr *,               // pointer
+			Complex64Ptr                       // reference
+	> {
+
+		ARRAY *a;
+		int position;
+		int size;
+
+	public:
+		explicit Complex64Itr(ARRAY *array, int length) : a(array), position(length) {
+
+		}
+
+		Complex64Itr &operator++() {
+			position++;
+			return *this;
+		}
+
+		bool operator==(Complex64Itr other) const { return position == other.position; }
+
+		bool operator!=(Complex64Itr other) const { return !(*this == other); }
+
+		reference operator*() const { return Complex64Ptr(&a->r[position], &a->i[position]); }
+
+
+	};
+
+public:
+	double r[8];
+	double i[8];
+
+	ARRAY() {
+		r[0] = 1;
+		r[1] = 2;
+		r[2] = 3;
+		r[3] = 4;
+		r[4] = 5;
+		r[5] = 6;
+		r[6] = 7;
+		r[7] = 8;
+		i[0] = 9;
+		i[1] = 10;
+		i[2] = 11;
+		i[3] = 12;
+		i[4] = 13;
+		i[5] = 14;
+		i[6] = 15;
+		i[7] = 16;
+	}
+
+	Complex64Itr begin() {
+		return Complex64Itr(this, 0);
+	}
+
+	Complex64Itr end() {
+		return Complex64Itr(this, 8);
+	}
+};
 
 int main() {
 
@@ -279,6 +344,29 @@ int main() {
 	abc = 1 / abc;
 
 	std::cout << abc << std::endl;
+
+	double r = 3.0;
+	double r2 = 1.0;
+	double i = 4.0;
+	double i2 = 2.0;
+	{
+		Complex64Ptr cPtrA(&r, &i);
+
+		*cPtrA = {11.0, 10.0};
+
+		std::cout << r << " + " << i << " i" << std::endl;
+		cPtrA();
+		std::cout << r << " + " << i << " i" << std::endl;
+		Complex64 *a = &*cPtrA;
+		a->square();
+
+	}
+	std::cout << r << " + " << i << " i : " << r2 << " + " << i2 << " i"
+			  << std::endl;
+
+	for (Complex64Ptr ptr : abc) {
+		std::cout << *ptr << std::endl;
+	}
 
 	return 0;
 
