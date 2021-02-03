@@ -1,5 +1,6 @@
 
 #define USE_FMA
+#define USE_CONCEPTS
 
 
 #define AML_USE_STD_COMPLEX
@@ -341,6 +342,8 @@ int main() {
 
 	Array8Complex64 abc(2.0 + 3_i);
 
+	log(abc);
+
 	abc = 1 / abc;
 
 	std::cout << abc << std::endl;
@@ -352,14 +355,14 @@ int main() {
 	{
 		Complex64Ptr cPtrA(&r, &i);
 
-		*cPtrA = {11.0, 10.0};
+		cPtrA = 11.0 + 10.0_i;
 
 		std::cout << r << " + " << i << " i" << std::endl;
 		cPtrA();
 		std::cout << r << " + " << i << " i" << std::endl;
 		Complex64 *a = &*cPtrA;
 		a->square();
-
+		cPtrA.subtract(1);
 	}
 	std::cout << r << " + " << i << " i : " << r2 << " + " << i2 << " i"
 			  << std::endl;

@@ -245,5 +245,17 @@ int main() {
 	ASSERT_AML(c17, sc17);
 	testCaseId++;
 
+	Complex64 c18 = 1.7 + 4.1_i;
+
+	std::complex<double> sc18 = (STD_COMPLEX64_CAST) c18;
+
+	c18 = log(c18);
+	sc18 = log(sc18);
+
+	std::cout << testCaseId << "\t:\t" << c18 << "\t\t\t:\t" << sc18 << std::endl;
+	ASSERT_AML(c18, sc18);
+	testCaseId++;
+
+
 	return 0;
 }

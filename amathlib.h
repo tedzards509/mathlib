@@ -3020,6 +3020,12 @@ class Complex64Ptr : public Complex64 {
 	double *r;
 	double *i;
 	uint32_t index = 0;
+
+	inline void update() {
+		*r = c.c[0];
+		*i = c.c[1];
+	}
+
 public:
 	inline Complex64Ptr(double *real, double *imag) : Complex64(*real, *imag) {
 		r = real;
@@ -3049,6 +3055,13 @@ public:
 	inline uint32_t getIndex() {
 		return index;
 	}
+
+	inline void operator=(Complex64 newVal) {
+		c.c[0] = newVal.c.c[0];
+		c.c[1] = newVal.c.c[1];
+		update();
+	}
+
 };
 
 
@@ -14017,6 +14030,22 @@ inline Array8Complex32 operator/(const Complex32 &lhs, const Array8Complex32 &rh
 	ret.i.c[7] = d2;
 	return ret;
 }
+
+#if defined(USE_CONCEPTS)
+template<class T>
+concept ComplexNumber = requires(T a, T b, Complex64 v){
+	a + a;
+	a * a;
+	a / b;
+	a.ln();
+	a.set(0, v);
+};
+
+template<ComplexNumber C>
+inline auto log(C c) { return *c.ln(); }
+
+
+#endif
 
 
 #endif //MATH_LIB_A_MATH_LIB_H
