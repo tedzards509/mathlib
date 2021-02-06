@@ -1511,6 +1511,23 @@ public:
 		return this;
 	}
 
+	template<const int a, const int b, const int c, const int d>
+	inline VectorDouble4D *permutation() {
+#if defined(USE_AVX2)
+		v.avx = _mm256_permute4x64_pd(v.avx,a + (b << 2) + (c << 4) + (d << 6));
+#else
+		double a1 = v.c[a];
+		double b1 = v.c[b];
+		double c1 = v.c[c];
+		double d1 = v.c[d];
+		v.c[0] = a1;
+		v.c[1] = b1;
+		v.c[2] = c1;
+		v.c[3] = d1;
+#endif
+		return this;
+	}
+
 
 	inline VectorDouble4D(double a, double b, double c, double d) {
 		v.c[0] = a;
@@ -1808,6 +1825,19 @@ public:
 		return this;
 	}
 
+	template<const int a, const int b, const int c, const int d>
+	inline VectorFloat4D *permutation() {
+		float a1 = v.c[a];
+		float b1 = v.c[b];
+		float c1 = v.c[c];
+		float d1 = v.c[d];
+		v.c[0] = a1;
+		v.c[1] = b1;
+		v.c[2] = c1;
+		v.c[3] = d1;
+		return this;
+	}
+
 
 	inline VectorFloat4D(float a, float b, float c, float d) {
 		v.c[0] = a;
@@ -1823,14 +1853,14 @@ public:
 		v.c[3] = 0;
 	}
 
-	inline explicit VectorFloat4D(const float a) {
+	inline VectorFloat4D(const float a) {
 		v.c[0] = a;
 		v.c[1] = a;
 		v.c[2] = a;
 		v.c[3] = a;
 	}
 
-	inline explicit VectorFloat4D(const float *const values) {
+	inline VectorFloat4D(const float *const values) {
 		v.c[0] = values[0];
 		v.c[1] = values[1];
 		v.c[2] = values[2];
@@ -4152,7 +4182,7 @@ public:
 
 	inline Array4Complex64() {}
 
-	inline Array4Complex64(Complex64 value) {
+	inline Array4Complex64(const Complex64 value) {
 		r.c[0] = value.c.c[0];
 		i.c[0] = value.c.c[1];
 		r.c[1] = value.c.c[0];
@@ -4172,16 +4202,20 @@ public:
 		return VectorDouble4D(i.c);
 	}
 
-	inline Complex64 operator[](uint64_t location) {
+	inline Complex64 operator[](const uint64_t location) {
 		return Complex64(r.c[location], i.c[location]);
 	}
 
-	inline void set(uint64_t location, Complex64 value) {
+	inline void set(const uint64_t location, const Complex64 value) {
 		r.c[location] = value.c.c[0];
 		i.c[location] = value.c.c[1];
 	}
 
-	inline Array4Complex64 *add(Array4Complex64 a) {
+	inline Array4Complex64 *add(const Array4Complex64 &a) {
+#if defined(USE_AVX)
+		i.avx = _mm256_add_pd(i.avx, a.i.avx);
+		r.avx = _mm256_add_pd(r.avx, a.r.avx);
+#else
 		i.c[0] += a.i.c[0];
 		i.c[1] += a.i.c[1];
 		i.c[2] += a.i.c[2];
@@ -4190,10 +4224,17 @@ public:
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
 		r.c[3] += a.r.c[3];
+#endif
 		return this;
 	}
 
-	inline Array4Complex64 *add(Complex64 a) {
+	inline Array4Complex64 *add(const Complex64 a) {
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		i.avx = _mm256_add_pd(i.avx, a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		r.avx = _mm256_add_pd(r.avx, a_r);
+#else
 		i.c[0] += a.c.c[1];
 		i.c[1] += a.c.c[1];
 		i.c[2] += a.c.c[1];
@@ -4202,10 +4243,15 @@ public:
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
 		r.c[3] += a.c.c[0];
+#endif
 		return this;
 	}
 
-	inline void operator+=(Array4Complex64 a) {
+	inline void operator+=(const Array4Complex64 &a) {
+#if defined(USE_AVX)
+		i.avx = _mm256_add_pd(i.avx, a.i.avx);
+		r.avx = _mm256_add_pd(r.avx, a.r.avx);
+#else
 		i.c[0] += a.i.c[0];
 		i.c[1] += a.i.c[1];
 		i.c[2] += a.i.c[2];
@@ -4214,9 +4260,16 @@ public:
 		r.c[1] += a.r.c[1];
 		r.c[2] += a.r.c[2];
 		r.c[3] += a.r.c[3];
+#endif
 	}
 
-	inline void operator+=(Complex64 a) {
+	inline void operator+=(const Complex64 a) {
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		i.avx = _mm256_add_pd(i.avx, a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		r.avx = _mm256_add_pd(r.avx, a_r);
+#else
 		i.c[0] += a.c.c[1];
 		i.c[1] += a.c.c[1];
 		i.c[2] += a.c.c[1];
@@ -4225,11 +4278,16 @@ public:
 		r.c[1] += a.c.c[0];
 		r.c[2] += a.c.c[0];
 		r.c[3] += a.c.c[0];
+#endif
 	}
 
 
-	inline Array4Complex64 operator+(Array4Complex64 a) const {
+	inline Array4Complex64 operator+(const Array4Complex64 &a) const {
 		Array4Complex64 ret{};
+#if defined(USE_AVX)
+		ret.i.avx = _mm256_add_pd(i.avx, a.i.avx);
+		ret.r.avx = _mm256_add_pd(r.avx, a.r.avx);
+#else
 		ret.i.c[0] = i.c[0] + a.i.c[0];
 		ret.i.c[1] = i.c[1] + a.i.c[1];
 		ret.i.c[2] = i.c[2] + a.i.c[2];
@@ -4238,11 +4296,18 @@ public:
 		ret.r.c[1] = r.c[1] + a.r.c[1];
 		ret.r.c[2] = r.c[2] + a.r.c[2];
 		ret.r.c[3] = r.c[3] + a.r.c[3];
+#endif
 		return ret;
 	}
 
-	inline Array4Complex64 operator+(Complex64 a) const {
+	inline Array4Complex64 operator+(const Complex64 a) const {
 		Array4Complex64 ret{};
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		ret.i.avx = _mm256_add_pd(i.avx, a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		ret.r.avx = _mm256_add_pd(r.avx, a_r);
+#else
 		ret.i.c[0] = i.c[0] + a.c.c[1];
 		ret.i.c[1] = i.c[1] + a.c.c[1];
 		ret.i.c[2] = i.c[2] + a.c.c[1];
@@ -4251,10 +4316,11 @@ public:
 		ret.r.c[1] = r.c[1] + a.c.c[0];
 		ret.r.c[2] = r.c[2] + a.c.c[0];
 		ret.r.c[3] = r.c[3] + a.c.c[0];
+#endif
 		return ret;
 	}
 
-	inline Array4Complex64 *add(Array4Complex64 a, VectorU8_4D mask) {
+	inline Array4Complex64 *add(const Array4Complex64 &a, const VectorU8_4D mask) {
 		if (mask.v.c[0]) {
 			i.c[0] += a.i.c[0];
 			r.c[0] += a.r.c[0];
@@ -4274,7 +4340,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 *add(Complex64 a, VectorU8_4D mask) {
+	inline Array4Complex64 *add(const Complex64 a, const VectorU8_4D mask) {
 		if (mask.v.c[0]) {
 			i.c[0] += a.c.c[1];
 			r.c[0] += a.c.c[0];
@@ -4295,7 +4361,11 @@ public:
 	}
 
 
-	inline Array4Complex64 *subtract(Array4Complex64 a) {
+	inline Array4Complex64 *subtract(const Array4Complex64 &a) {
+#if defined(USE_AVX)
+		i.avx = _mm256_sub_pd(i.avx, a.i.avx);
+		r.avx = _mm256_sub_pd(r.avx, a.r.avx);
+#else
 		i.c[0] -= a.i.c[0];
 		i.c[1] -= a.i.c[1];
 		i.c[2] -= a.i.c[2];
@@ -4304,10 +4374,17 @@ public:
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
 		r.c[3] -= a.r.c[3];
+#endif
 		return this;
 	}
 
-	inline Array4Complex64 *subtract(Complex64 a) {
+	inline Array4Complex64 *subtract(const Complex64 a) {
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		i.avx = _mm256_sub_pd(i.avx, a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		r.avx = _mm256_sub_pd(r.avx, a_r);
+#else
 		i.c[0] -= a.c.c[1];
 		i.c[1] -= a.c.c[1];
 		i.c[2] -= a.c.c[1];
@@ -4316,10 +4393,15 @@ public:
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
 		r.c[3] -= a.c.c[0];
+#endif
 		return this;
 	}
 
-	inline void operator-=(Array4Complex64 a) {
+	inline void operator-=(const Array4Complex64 &a) {
+#if defined(USE_AVX)
+		i.avx = _mm256_sub_pd(i.avx, a.i.avx);
+		r.avx = _mm256_sub_pd(r.avx, a.r.avx);
+#else
 		i.c[0] -= a.i.c[0];
 		i.c[1] -= a.i.c[1];
 		i.c[2] -= a.i.c[2];
@@ -4328,9 +4410,16 @@ public:
 		r.c[1] -= a.r.c[1];
 		r.c[2] -= a.r.c[2];
 		r.c[3] -= a.r.c[3];
+#endif
 	}
 
-	inline void operator-=(Complex64 a) {
+	inline void operator-=(const Complex64 a) {
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		i.avx = _mm256_sub_pd(i.avx, a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		r.avx = _mm256_sub_pd(r.avx, a_r);
+#else
 		i.c[0] -= a.c.c[1];
 		i.c[1] -= a.c.c[1];
 		i.c[2] -= a.c.c[1];
@@ -4339,10 +4428,15 @@ public:
 		r.c[1] -= a.c.c[0];
 		r.c[2] -= a.c.c[0];
 		r.c[3] -= a.c.c[0];
+#endif
 	}
 
-	inline Array4Complex64 operator-(Array4Complex64 a) const {
+	inline Array4Complex64 operator-(const Array4Complex64 &a) const {
 		Array4Complex64 ret;
+#if defined(USE_AVX)
+		ret.i.avx = _mm256_sub_pd(i.avx, a.i.avx);
+		ret.r.avx = _mm256_sub_pd(r.avx, a.r.avx);
+#else
 		ret.i.c[0] = i.c[0] - a.i.c[0];
 		ret.i.c[1] = i.c[1] - a.i.c[1];
 		ret.i.c[2] = i.c[2] - a.i.c[2];
@@ -4351,11 +4445,18 @@ public:
 		ret.r.c[1] = r.c[1] - a.r.c[1];
 		ret.r.c[2] = r.c[2] - a.r.c[2];
 		ret.r.c[3] = r.c[3] - a.r.c[3];
+#endif
 		return ret;
 	}
 
-	inline Array4Complex64 operator-(Complex64 a) const {
+	inline Array4Complex64 operator-(const Complex64 a) const {
 		Array4Complex64 ret;
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		ret.i.avx = _mm256_sub_pd(i.avx, a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		ret.r.avx = _mm256_sub_pd(r.avx, a_r);
+#else
 		ret.i.c[0] = i.c[0] - a.c.c[1];
 		ret.i.c[1] = i.c[1] - a.c.c[1];
 		ret.i.c[2] = i.c[2] - a.c.c[1];
@@ -4364,10 +4465,11 @@ public:
 		ret.r.c[1] = r.c[1] - a.c.c[0];
 		ret.r.c[2] = r.c[2] - a.c.c[0];
 		ret.r.c[3] = r.c[3] - a.c.c[0];
+#endif
 		return ret;
 	}
 
-	inline Array4Complex64 *subtract(Array4Complex64 a, VectorU8_4D mask) {
+	inline Array4Complex64 *subtract(const Array4Complex64 &a, const VectorU8_4D &mask) {
 		if (mask.v.c[0]) {
 			i.c[0] -= a.i.c[0];
 			r.c[0] -= a.r.c[0];
@@ -4387,7 +4489,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 *subtract(Complex64 a, VectorU8_4D mask) {
+	inline Array4Complex64 *subtract(const Complex64 a, const VectorU8_4D &mask) {
 		if (mask.v.c[0]) {
 			i.c[0] -= a.c.c[1];
 			r.c[0] -= a.c.c[0];
@@ -4410,6 +4512,12 @@ public:
 
 	inline Array4Complex64 operator*(const Array4Complex64 &a) const {
 		Array4Complex64 ret;
+#if defined(USE_FMA)
+		__m256d c_0 = _mm256_mul_pd(i.avx, a.i.avx);
+		ret.r.avx = _mm256_fmsub_pd(r.avx, a.r.avx,c_0);
+		__m256d c_2 = _mm256_mul_pd(i.avx, a.r.avx);
+		ret.i.avx = _mm256_fmadd_pd(r.avx, a.i.avx,c_2);
+#else
 		ret.r.c[0] = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
 		ret.i.c[0] = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		ret.r.c[1] = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
@@ -4418,6 +4526,7 @@ public:
 		ret.i.c[2] = r.c[2] * a.i.c[2] + i.c[2] * a.r.c[2];
 		ret.r.c[3] = r.c[3] * a.r.c[3] - i.c[3] * a.i.c[3];
 		ret.i.c[3] = r.c[3] * a.i.c[3] + i.c[3] * a.r.c[3];
+#endif
 
 
 		return ret;
@@ -4446,7 +4555,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 operator*(const Complex64 &a) const {
+	inline Array4Complex64 operator*(const Complex64 a) const {
 		Array4Complex64 ret;
 		ret.r.c[0] = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
 		ret.i.c[0] = r.c[0] * a.c.c[1] + i.c[0] * a.c.c[0];
@@ -4483,7 +4592,7 @@ public:
 		i.c[3] = d2;
 	}
 
-	inline void operator*=(const Complex64 &a) {
+	inline void operator*=(const Complex64 a) {
 		double d1;
 		double d2;
 		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
@@ -4504,7 +4613,7 @@ public:
 		i.c[3] = d2;
 	}
 
-	inline Array4Complex64 *multiply(const Complex64 &a) {
+	inline Array4Complex64 *multiply(const Complex64 a) {
 		double d1;
 		double d2;
 		d1 = r.c[0] * a.c.c[0] - i.c[0] * a.c.c[1];
@@ -4526,7 +4635,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 *multiply(const Complex64 &a, const VectorU8_4D &mask) {
+	inline Array4Complex64 *multiply(const Complex64 a, const VectorU8_4D &mask) {
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
@@ -4740,7 +4849,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 operator/(const Complex64 &a) const {
+	inline Array4Complex64 operator/(const Complex64 a) const {
 		Array4Complex64 ret;
 		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
@@ -4782,7 +4891,7 @@ public:
 		return ret;
 	}
 
-	inline void operator/=(const Complex64 &a) {
+	inline void operator/=(const Complex64 a) {
 		double d1 = (r.c[0] * a.c.c[0] + i.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		double d2 = (i.c[0] * a.c.c[0] - r.c[0] * a.c.c[1]) / (a.c.c[0] * a.c.c[0] + a.c.c[1] * a.c.c[1]);
 		r.c[0] = d1;
@@ -4968,7 +5077,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 *sin(const VectorU8_4D mask) {
+	inline Array4Complex64 *sin(const VectorU8_4D &mask) {
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
@@ -4998,7 +5107,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 *cos(const VectorU8_4D mask) {
+	inline Array4Complex64 *cos(const VectorU8_4D &mask) {
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
@@ -5028,7 +5137,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 *tan(const VectorU8_4D mask) {
+	inline Array4Complex64 *tan(const VectorU8_4D &mask) {
 		double d1;
 		double d2;
 		if (mask.v.c[0]) {
@@ -5129,7 +5238,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 *pow(Array4Complex64 n) {
+	inline Array4Complex64 *pow(Array4Complex64 &n) {
 		double d1 = ::log(i.c[0] * i.c[0] + r.c[0] * r.c[0]) / 2;
 		double d2 = ::atan2(r.c[0], i.c[0]);
 		double d3 = ::exp(d1 * n.i.c[0] - d2 * n.r.c[0]);
@@ -5202,7 +5311,7 @@ public:
 		return this;
 	}
 
-	inline Array4Complex64 *pow(Array4Complex64 n, const VectorU8_4D &mask) {
+	inline Array4Complex64 *pow(Array4Complex64 &n, const VectorU8_4D &mask) {
 		double d1;
 		double d2;
 		double d3;
@@ -5693,6 +5802,12 @@ public:
 	inline Array8Complex64() {}
 
 	inline Array8Complex64(Complex64 value) {
+#if defined(USE_AVX)
+		r.avx[0] = _mm256_set1_pd(value.c.c[0]);
+		r.avx[1] = _mm256_set1_pd(value.c.c[0]);
+		i.avx[0] = _mm256_set1_pd(value.c.c[1]);
+		i.avx[1] = _mm256_set1_pd(value.c.c[1]);
+#else
 		r.c[0] = value.c.c[0];
 		i.c[0] = value.c.c[1];
 		r.c[1] = value.c.c[0];
@@ -5709,6 +5824,7 @@ public:
 		i.c[6] = value.c.c[1];
 		r.c[7] = value.c.c[0];
 		i.c[7] = value.c.c[1];
+#endif
 	}
 
 	inline VectorDouble8D real() {
@@ -5867,7 +5983,7 @@ public:
 	}
 
 	inline Array8Complex64 operator+(Complex64 a) const {
-		Array8Complex64 ret;
+		Array8Complex64 ret{};
 #if defined(USE_AVX)
 		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
 		ret.i.avx[0] = _mm256_add_pd(i.avx[0], a_i);
@@ -5969,6 +6085,12 @@ public:
 	}
 
 	inline Array8Complex64 *subtract(Array8Complex64 a) {
+#if defined(USE_AVX)
+		i.avx[0] = _mm256_sub_pd(i.avx[0], a.i.avx[0]);
+		i.avx[1] = _mm256_sub_pd(i.avx[1], a.i.avx[1]);
+		r.avx[0] = _mm256_sub_pd(r.avx[0], a.r.avx[0]);
+		r.avx[1] = _mm256_sub_pd(r.avx[1], a.r.avx[1]);
+#else
 		i.c[0] -= a.i.c[0];
 		i.c[1] -= a.i.c[1];
 		i.c[2] -= a.i.c[2];
@@ -5985,10 +6107,19 @@ public:
 		r.c[5] -= a.r.c[5];
 		r.c[6] -= a.r.c[6];
 		r.c[7] -= a.r.c[7];
+#endif
 		return this;
 	}
 
 	inline Array8Complex64 *subtract(Complex64 a) {
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		i.avx[0] = _mm256_sub_pd(i.avx[0], a_i);
+		i.avx[1] = _mm256_sub_pd(i.avx[1], a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		r.avx[0] = _mm256_sub_pd(r.avx[0], a_r);
+		r.avx[1] = _mm256_sub_pd(r.avx[1], a_r);
+#else
 		i.c[0] -= a.c.c[1];
 		i.c[1] -= a.c.c[1];
 		i.c[2] -= a.c.c[1];
@@ -6005,10 +6136,17 @@ public:
 		r.c[5] -= a.c.c[0];
 		r.c[6] -= a.c.c[0];
 		r.c[7] -= a.c.c[0];
+#endif
 		return this;
 	}
 
 	inline void operator-=(Array8Complex64 a) {
+#if defined(USE_AVX)
+		i.avx[0] = _mm256_sub_pd(i.avx[0], a.i.avx[0]);
+		i.avx[1] = _mm256_sub_pd(i.avx[1], a.i.avx[1]);
+		r.avx[0] = _mm256_sub_pd(r.avx[0], a.r.avx[0]);
+		r.avx[1] = _mm256_sub_pd(r.avx[1], a.r.avx[1]);
+#else
 		i.c[0] -= a.i.c[0];
 		i.c[1] -= a.i.c[1];
 		i.c[2] -= a.i.c[2];
@@ -6025,9 +6163,18 @@ public:
 		r.c[5] -= a.r.c[5];
 		r.c[6] -= a.r.c[6];
 		r.c[7] -= a.r.c[7];
+#endif
 	}
 
 	inline void operator-=(Complex64 a) {
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		i.avx[0] = _mm256_sub_pd(i.avx[0], a_i);
+		i.avx[1] = _mm256_sub_pd(i.avx[1], a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		r.avx[0] = _mm256_sub_pd(r.avx[0], a_r);
+		r.avx[1] = _mm256_sub_pd(r.avx[1], a_r);
+#else
 		i.c[0] -= a.c.c[1];
 		i.c[1] -= a.c.c[1];
 		i.c[2] -= a.c.c[1];
@@ -6044,10 +6191,17 @@ public:
 		r.c[5] -= a.c.c[0];
 		r.c[6] -= a.c.c[0];
 		r.c[7] -= a.c.c[0];
+#endif
 	}
 
 	inline Array8Complex64 operator-(Array8Complex64 a) const {
 		Array8Complex64 ret;
+#if defined(USE_AVX)
+		ret.i.avx[0] = _mm256_sub_pd(i.avx[0], a.i.avx[0]);
+		ret.i.avx[1] = _mm256_sub_pd(i.avx[1], a.i.avx[1]);
+		ret.r.avx[0] = _mm256_sub_pd(r.avx[0], a.r.avx[0]);
+		ret.r.avx[1] = _mm256_sub_pd(r.avx[1], a.r.avx[1]);
+#else
 		ret.i.c[0] = i.c[0] - a.i.c[0];
 		ret.i.c[1] = i.c[1] - a.i.c[1];
 		ret.i.c[2] = i.c[2] - a.i.c[2];
@@ -6064,11 +6218,20 @@ public:
 		ret.r.c[5] = r.c[5] - a.r.c[5];
 		ret.r.c[6] = r.c[6] - a.r.c[6];
 		ret.r.c[7] = r.c[7] - a.r.c[7];
+#endif
 		return ret;
 	}
 
 	inline Array8Complex64 operator-(Complex64 a) const {
 		Array8Complex64 ret;
+#if defined(USE_AVX)
+		__m256d a_i = {a.c.c[1], a.c.c[1], a.c.c[1], a.c.c[1]};
+		ret.i.avx[0] = _mm256_sub_pd(i.avx[0], a_i);
+		ret.i.avx[1] = _mm256_sub_pd(i.avx[1], a_i);
+		__m256d a_r = {a.c.c[0], a.c.c[0], a.c.c[0], a.c.c[0]};
+		ret.r.avx[0] = _mm256_sub_pd(r.avx[0], a_r);
+		ret.r.avx[1] = _mm256_sub_pd(r.avx[1], a_r);
+#else
 		ret.i.c[0] = i.c[0] - a.c.c[1];
 		ret.i.c[1] = i.c[1] - a.c.c[1];
 		ret.i.c[2] = i.c[2] - a.c.c[1];
@@ -6085,6 +6248,7 @@ public:
 		ret.r.c[5] = r.c[5] - a.c.c[0];
 		ret.r.c[6] = r.c[6] - a.c.c[0];
 		ret.r.c[7] = r.c[7] - a.c.c[0];
+#endif
 		return ret;
 	}
 
@@ -6163,6 +6327,16 @@ public:
 
 	inline Array8Complex64 operator*(const Array8Complex64 &a) const {
 		Array8Complex64 ret;
+#if defined(USE_FMA)
+		__m256d c_0 = _mm256_mul_pd(i.avx[0], a.i.avx[0]);
+		ret.r.avx[0] = _mm256_fmsub_pd(r.avx[0], a.r.avx[0],c_0);
+		__m256d c_1 = _mm256_mul_pd(i.avx[1], a.i.avx[1]);
+		ret.r.avx[1] = _mm256_fmsub_pd(r.avx[1], a.r.avx[1],c_1);
+		__m256d c_2 = _mm256_mul_pd(i.avx[0], a.r.avx[0]);
+		ret.i.avx[0] = _mm256_fmadd_pd(r.avx[0], a.i.avx[0],c_2);
+		__m256d c_3 = _mm256_mul_pd(i.avx[1], a.r.avx[1]);
+		ret.i.avx[1] = _mm256_fmadd_pd(r.avx[1], a.i.avx[1],c_3);
+#else
 		ret.r.c[0] = r.c[0] * a.r.c[0] - i.c[0] * a.i.c[0];
 		ret.i.c[0] = r.c[0] * a.i.c[0] + i.c[0] * a.r.c[0];
 		ret.r.c[1] = r.c[1] * a.r.c[1] - i.c[1] * a.i.c[1];
@@ -6179,7 +6353,7 @@ public:
 		ret.i.c[6] = r.c[6] * a.i.c[6] + i.c[6] * a.r.c[6];
 		ret.r.c[7] = r.c[7] * a.r.c[7] - i.c[7] * a.i.c[7];
 		ret.i.c[7] = r.c[7] * a.i.c[7] + i.c[7] * a.r.c[7];
-
+#endif
 
 		return ret;
 	}
