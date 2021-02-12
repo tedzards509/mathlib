@@ -54,3 +54,5 @@ this library may add a safe math flag. Do not use this
 library in safety critical mechanisms(encryption, aerospace,
 automotive). This library has undefined behavior(e.g. an
 internal division by 0) and it's not documented.
+
+C++ 14 compiler required.

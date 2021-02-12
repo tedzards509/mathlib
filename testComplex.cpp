@@ -257,5 +257,8 @@ int main() {
 	testCaseId++;
 
 
+	std::cout << "test complete" << std::endl;
+
+
 	return 0;
 }

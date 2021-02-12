@@ -14205,6 +14205,8 @@ inline Array8Complex32 operator/(const Complex32 &lhs, const Array8Complex32 &rh
 	return ret;
 }
 
+#if defined(AML_USE_STD_COMPLEX)
+
 #if defined(USE_CONCEPTS)
 template<class T>
 concept ComplexNumber = requires(T a, T b, Complex64 v){
@@ -14214,12 +14216,51 @@ concept ComplexNumber = requires(T a, T b, Complex64 v){
 	a.ln();
 	a.set(0, v);
 };
+#endif
+
+
+#if defined(USE_CONCEPTS)
 
 template<ComplexNumber C>
+#else
+template<class C>
+#endif
 inline auto log(C c) { return *c.ln(); }
 
+#if defined(USE_CONCEPTS)
 
+template<ComplexNumber C>
+#else
+template<class C>
 #endif
+inline auto sin(C c) { return *c.sin(); }
+
+#if defined(USE_CONCEPTS)
+
+template<ComplexNumber C>
+#else
+template<class C>
+#endif
+inline auto log10(C c) { return *c.log10(); }
+
+#if defined(USE_CONCEPTS)
+
+template<ComplexNumber C>
+#else
+template<class C>
+#endif
+inline auto tan(C c) { return *c.tan(); }
+
+#if defined(USE_CONCEPTS)
+
+template<ComplexNumber C>
+#else
+template<class C>
+#endif
+inline auto cos(C c) { return *c.cos(); }
+
+
+#endif //std::complex compatibility
 
 
 #endif //MATH_LIB_A_MATH_LIB_H
