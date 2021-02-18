@@ -12,9 +12,9 @@
 #include <chrono>
 
 /*
- * This sample shows how to implement the mandelbrot set in C++. It is implemented in two ways a fast and a slow one.
- * It is recommended to know what the mandelbrot set is, not only because it makes it easy to follow, but because it is a
- * beautiful part of mathematics. Refer to https://en.wikipedia.org/wiki/Mandelbrot_set when needed.
+ * This sample shows how to implement the Mandelbrot set in C++. It is implemented in two ways a fast and a slow one.
+ * It is recommended to know what the Mandelbrot set is, not only because it makes it easy to follow, but because not knowing what it is makes you suck.
+ * Refer to https://en.wikipedia.org/wiki/Mandelbrot_set when needed.
  *
  * To compile on x86-64 choose clang or gcc and run
  * 		clang++ -O3 -ffast-math -march=native mandelbrot.cpp -o mandelbrot
